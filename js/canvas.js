@@ -1,107 +1,9 @@
-// ===========================
-// CANVAS.JS - Canvas Setup & Drawing Logic
-// ===========================
+// canvas.js
+// Handles SignaturePad setup, history (saveState, undo, redo), and stroke properties.
 
-// DOM Elements - Canvas
-const canvas = document.getElementById('signatureCanvas');
-const container = document.getElementById('canvasContainer');
-const hint = document.getElementById('canvasHint');
-const clearBtn = document.getElementById('clearBtn');
-const undoBtn = document.getElementById('undoBtn');
-const redoBtn = document.getElementById('redoBtn');
-const ctx = canvas.getContext('2d');
-
-// Selection Canvas
-const selectionCanvas = document.getElementById('selectionCanvas');
-const sctx = selectionCanvas.getContext('2d');
-const selectedBounds = document.getElementById('selectedBounds');
-const selectionInfo = document.getElementById('selectionInfo');
-
-// Drawing State
-let currentThickness = 2.5;
-let currentStrokeType = 'natural';
-let currentAlpha = 1.0;
-let lastBaseColor = "#ffffff";
-
-// History System
-let history = [];
-let redoStack = [];
-
-// Selection State
-let selectedStrokeIndices = [];
-let isSelecting = false;
-let isMoving = false;
-let isResizing = false;
-let selectStart = { x: 0, y: 0 };
-let moveStart = { x: 0, y: 0 };
-let resizeStart = { x: 0, y: 0 };
-let resizeType = '';
-
-// Mode State
-let currentMode = 'draw';
-let modeBeforeMiddleClick = null;
-
-// ===========================
-// SIGNATURE PAD SETUP
-// ===========================
-const signaturePad = new SignaturePad(canvas, {
-    backgroundColor: 'rgba(0,0,0,0)',
-    penColor: '#ffffff',
-    minWidth: 1.5,
-    maxWidth: 4.5,
-    velocityFilterWeight: 0.7
-});
-
-// ===========================
-// CANVAS RESIZE LOGIC
-// ===========================
-const observer = new ResizeObserver(() => {
-    syncSizeValues();
-    resizeCanvas();
-});
-observer.observe(container);
-
-function syncSizeValues() {
-    const canvasWidthVal = document.getElementById('canvasWidthVal');
-    const canvasHeightVal = document.getElementById('canvasHeightVal');
-    if (document.activeElement !== canvasWidthVal) canvasWidthVal.value = Math.round(container.offsetWidth);
-    if (document.activeElement !== canvasHeightVal) canvasHeightVal.value = Math.round(container.offsetHeight);
-}
-
-function resizeCanvas() {
-    const data = signaturePad.toData();
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-
-    const newWidth = container.offsetWidth * ratio;
-    const newHeight = container.offsetHeight * ratio;
-
-    if (canvas.width !== newWidth || canvas.height !== newHeight) {
-        canvas.width = newWidth;
-        canvas.height = newHeight;
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.scale(ratio, ratio);
-
-        selectionCanvas.width = newWidth;
-        selectionCanvas.height = newHeight;
-        sctx.setTransform(1, 0, 0, 1, 0, 0);
-        sctx.scale(ratio, ratio);
-
-        signaturePad.clear();
-        if (data.length > 0) {
-            signaturePad.fromData(data);
-            hint.classList.add('hidden');
-        } else {
-            hint.classList.remove('hidden');
-        }
-        drawSelectionHighlights();
-    }
-}
-
-// ===========================
-// HISTORY SYSTEM
-// ===========================
 function saveState() {
-    const data = signaturePad.toData();
+    // High-fidelity deep clone to prevent accidental mutations by reference
+    const data = JSON.parse(JSON.stringify(signaturePad.toData()));
     const selection = [...selectedStrokeIndices];
     history.push({ data, selection });
     redoStack = [];
@@ -111,10 +13,12 @@ function saveState() {
 
 function undo() {
     if (history.length > 0) {
-        const currentData = signaturePad.toData();
+        // Current state to redo
+        const currentData = JSON.parse(JSON.stringify(signaturePad.toData()));
         const currentSelection = [...selectedStrokeIndices];
         redoStack.push({ data: currentData, selection: currentSelection });
 
+        // Restore last state
         const lastState = history.pop();
         signaturePad.fromData(lastState.data);
         selectedStrokeIndices = lastState.selection || [];
@@ -126,15 +30,18 @@ function undo() {
         drawSelectionHighlights();
         syncControlsWithSelection();
         updateHistoryButtons();
+        updateStrokePreview();
     }
 }
 
 function redo() {
     if (redoStack.length > 0) {
-        const currentData = signaturePad.toData();
+        // Current state to history
+        const currentData = JSON.parse(JSON.stringify(signaturePad.toData()));
         const currentSelection = [...selectedStrokeIndices];
         history.push({ data: currentData, selection: currentSelection });
 
+        // Restore next state
         const nextState = redoStack.pop();
         signaturePad.fromData(nextState.data);
         selectedStrokeIndices = nextState.selection || [];
@@ -144,17 +51,46 @@ function redo() {
         drawSelectionHighlights();
         syncControlsWithSelection();
         updateHistoryButtons();
+        updateStrokePreview();
     }
 }
 
 function updateHistoryButtons() {
-    undoBtn.disabled = history.length === 0;
-    redoBtn.disabled = redoStack.length === 0;
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+    if (undoBtn) undoBtn.disabled = history.length === 0;
+    if (redoBtn) redoBtn.disabled = redoStack.length === 0;
 }
 
-// ===========================
-// STROKE STYLES
-// ===========================
+function updateThickness(newVal) {
+    currentThickness = Math.max(1, Math.min(20, parseFloat(parseFloat(newVal).toFixed(1))));
+
+    const thicknessVal = document.getElementById('thicknessVal');
+    const thicknessSlider = document.getElementById('thicknessSlider');
+    if (thicknessVal) thicknessVal.value = currentThickness;
+    if (thicknessSlider) thicknessSlider.value = currentThickness;
+
+    if ((currentMode === 'select' || currentMode === 'transform') && selectedStrokeIndices.length > 0) {
+        saveState();
+        const data = signaturePad.toData();
+        selectedStrokeIndices.forEach(index => {
+            if (data[index]) {
+                let min, max;
+                if (currentStrokeType === 'marker') { min = currentThickness; max = currentThickness; }
+                else if (currentStrokeType === 'pen') { min = currentThickness * 0.15; max = currentThickness * 3.0; }
+                else { min = currentThickness * 0.45; max = currentThickness * 2.0; }
+                data[index].minWidth = min;
+                data[index].maxWidth = max;
+            }
+        });
+        signaturePad.fromData(data);
+        drawSelectionHighlights();
+    } else {
+        updateStrokeStyles();
+    }
+    updateStrokePreview();
+}
+
 function updateStrokeStyles() {
     const preset = currentStrokeType;
     switch (preset) {
@@ -164,216 +100,126 @@ function updateStrokeStyles() {
             signaturePad.velocityFilterWeight = 1;
             break;
         case 'pen':
-            signaturePad.minWidth = currentThickness * 0.3;
-            signaturePad.maxWidth = currentThickness * 2.5;
-            signaturePad.velocityFilterWeight = 0.4;
+            signaturePad.minWidth = currentThickness * 0.15;
+            signaturePad.maxWidth = currentThickness * 3.0;
+            signaturePad.velocityFilterWeight = 0.45;
             break;
         case 'natural':
         default:
-            signaturePad.minWidth = currentThickness * 0.6;
-            signaturePad.maxWidth = currentThickness * 1.8;
-            signaturePad.velocityFilterWeight = 0.7;
+            signaturePad.minWidth = currentThickness * 0.45;
+            signaturePad.maxWidth = currentThickness * 2.0;
+            signaturePad.velocityFilterWeight = 0.65;
             break;
     }
-    if (window.updateStrokePreview) window.updateStrokePreview();
+    updateStrokePreview();
 }
 
-// ===========================
-// COLOR AND ALPHA
-// ===========================
-function applyColor(colorHex) {
-    lastBaseColor = colorHex;
-    const finalColor = window.hexToRgba(colorHex, currentAlpha);
-    signaturePad.penColor = finalColor;
-
+function applyStrokeType(type) {
+    currentStrokeType = type;
     if ((currentMode === 'select' || currentMode === 'transform') && selectedStrokeIndices.length > 0) {
         saveState();
-
         const data = signaturePad.toData();
-        let modified = false;
         selectedStrokeIndices.forEach(index => {
             if (data[index]) {
-                data[index].color = finalColor;
-                modified = true;
+                let min, max;
+                if (currentStrokeType === 'marker') { min = currentThickness; max = currentThickness; }
+                else if (currentStrokeType === 'pen') { min = currentThickness * 0.15; max = currentThickness * 3.0; }
+                else { min = currentThickness * 0.45; max = currentThickness * 2.0; }
+                data[index].minWidth = min;
+                data[index].maxWidth = max;
             }
         });
-        if (modified) {
-            signaturePad.fromData(data);
-            updateSelectedBounds();
-        }
-    }
-    if (window.updateStrokePreview) window.updateStrokePreview();
-}
-
-// ===========================
-// SELECTION LOGIC
-// ===========================
-function updateSelectedBounds() {
-    if (selectedStrokeIndices.length === 0 || (currentMode !== 'transform' && currentMode !== 'select')) {
-        selectedBounds.style.display = 'none';
-        return;
-    }
-
-    const data = signaturePad.toData();
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-    let hasStroke = false;
-    selectedStrokeIndices.forEach(idx => {
-        if (data[idx]) {
-            hasStroke = true;
-            data[idx].points.forEach(p => {
-                minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
-                maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
-            });
-        }
-    });
-
-    if (!hasStroke) {
-        selectedBounds.style.display = 'none';
-        return;
-    }
-
-    const ratio = 1.0;
-    const padding = 5;
-    selectedBounds.style.left = (minX * ratio - padding) + 'px';
-    selectedBounds.style.top = (minY * ratio - padding) + 'px';
-    selectedBounds.style.width = ((maxX - minX) * ratio + padding * 2) + 'px';
-    selectedBounds.style.height = ((maxY - minY) * ratio + padding * 2) + 'px';
-    selectedBounds.style.display = 'block';
-
-    if (currentMode === 'select') {
-        selectedBounds.classList.add('no-handles');
-        selectedBounds.style.border = 'none';
-        selectedBounds.style.opacity = '0';
+        signaturePad.fromData(data);
+        drawSelectionHighlights();
     } else {
-        selectedBounds.classList.remove('no-handles');
-        selectedBounds.style.border = '1px dashed var(--primary)';
-        selectedBounds.style.opacity = '1';
+        updateStrokeStyles();
     }
+    updateStrokePreview();
 }
 
-function drawSelectionHighlights() {
-    sctx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
-    if (selectedStrokeIndices.length === 0 || currentMode !== 'select') return;
-
-    const data = signaturePad.toData();
-    sctx.lineCap = 'round';
-    sctx.lineJoin = 'round';
-
-    selectedStrokeIndices.forEach(idx => {
-        const stroke = data[idx];
-        if (!stroke || stroke.points.length < 2) return;
-
-        sctx.beginPath();
-        sctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-        stroke.points.forEach((p, i) => {
-            if (i > 0) sctx.lineTo(p.x, p.y);
-        });
-
-        sctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
-        sctx.lineWidth = (stroke.maxWidth + stroke.minWidth) + 10;
-        sctx.stroke();
-
-        sctx.strokeStyle = 'rgba(99, 102, 241, 0.8)';
-        sctx.lineWidth = 2;
-        sctx.stroke();
-    });
+function hexToRgba(hex, alpha) {
+    if (alpha >= 1) return hex;
+    let r, g, b;
+    if (hex.length === 4) {
+        r = parseInt(hex[1] + hex[1], 16);
+        g = parseInt(hex[2] + hex[2], 16);
+        b = parseInt(hex[3] + hex[3], 16);
+    } else {
+        r = parseInt(hex.slice(1, 3), 16);
+        g = parseInt(hex.slice(3, 5), 16);
+        b = parseInt(hex.slice(5, 7), 16);
+    }
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function selectStrokes(indices, saveHistory = true) {
-    const isSame = indices.length === selectedStrokeIndices.length &&
-        indices.every((val, index) => val === selectedStrokeIndices[index]);
-    if (isSame) return;
+function applyColor(colorHex) {
+    if (!colorHex) return;
+    lastBaseColor = colorHex;
+    const finalColor = hexToRgba(colorHex, currentAlpha);
 
-    if (saveHistory) saveState();
+    signaturePad.penColor = finalColor;
 
-    selectedStrokeIndices = indices;
-    selectionInfo.innerText = `Trazos Seleccionados: ${indices.length}`;
-    selectionInfo.style.display = indices.length > 0 ? 'block' : 'none';
-    updateSelectedBounds();
-    drawSelectionHighlights();
-    syncControlsWithSelection();
-}
-
-function deselectStroke(saveHistory = true) {
-    if (selectedStrokeIndices.length === 0) return;
-
-    if (saveHistory) saveState();
-
-    selectedStrokeIndices = [];
-    selectionInfo.style.display = 'none';
-    updateSelectedBounds();
-    drawSelectionHighlights();
-}
-
-function syncControlsWithSelection() {
     if (selectedStrokeIndices.length > 0) {
+        saveState();
         const data = signaturePad.toData();
-        const firstStroke = data[selectedStrokeIndices[0]];
-        if (firstStroke) {
-            currentThickness = (firstStroke.maxWidth + firstStroke.minWidth) / 2;
-            const thicknessVal = document.getElementById('thicknessVal');
-            const thicknessSlider = document.getElementById('thicknessSlider');
-            thicknessVal.value = currentThickness.toFixed(1);
-            thicknessSlider.value = currentThickness;
+        selectedStrokeIndices.forEach(index => {
+            if (data[index]) {
+                data[index].penColor = finalColor;
+            }
+        });
+        signaturePad.fromData(data);
+    }
 
-            const colorDots = document.querySelectorAll('.color-dot');
-            colorDots.forEach(dot => {
-                if (dot.getAttribute('data-color') === firstStroke.color) {
-                    colorDots.forEach(d => d.classList.remove('active'));
-                    dot.classList.add('active');
-                    lastBaseColor = dot.getAttribute('data-color');
-                }
-            });
+    updateSelectedBounds();
+    if (typeof drawSelectionHighlights === 'function') drawSelectionHighlights();
+    updateStrokePreview();
+}
+
+function updateStrokePreview() {
+    const previewCanvas = document.getElementById('strokePreviewCanvas');
+    if (!previewCanvas) return;
+    const pctx = previewCanvas.getContext('2d');
+    const w = previewCanvas.clientWidth;
+    const h = previewCanvas.clientHeight;
+    previewCanvas.width = w;
+    previewCanvas.height = h;
+
+    pctx.clearRect(0, 0, w, h);
+    pctx.strokeStyle = hexToRgba(lastBaseColor, currentAlpha);
+    pctx.lineCap = 'round';
+    pctx.lineJoin = 'round';
+
+    const centerY = h / 2;
+    const startX = w * 0.15;
+    const endX = w * 0.85;
+
+    let minW, maxW;
+    if (currentStrokeType === 'marker') { minW = currentThickness; maxW = currentThickness; }
+    else if (currentStrokeType === 'pen') { minW = currentThickness * 0.3; maxW = currentThickness * 2.5; }
+    else { minW = currentThickness * 0.6; maxW = currentThickness * 1.8; }
+
+    const points = 40;
+    for (let i = 0; i <= points; i++) {
+        const t = i / points;
+        const x = startX + (endX - startX) * t;
+        const angle = t * Math.PI;
+        const swing = Math.sin(angle * 2) * (h * 0.2);
+        const y = centerY + swing;
+
+        const pressure = 0.3 + Math.sin(t * Math.PI) * 0.7;
+        const currentW = minW + (maxW - minW) * pressure;
+
+        if (i === 0) pctx.moveTo(x, y);
+        else {
+            pctx.beginPath();
+            const prevT = (i - 1) / points;
+            const prevX = startX + (endX - startX) * prevT;
+            const prevSwing = Math.sin(prevT * Math.PI * 2) * (h * 0.2);
+            const prevY = centerY + prevSwing;
+            pctx.moveTo(prevX, prevY);
+            pctx.lineTo(x, y);
+            pctx.lineWidth = currentW;
+            pctx.stroke();
         }
     }
 }
-
-// ===========================
-// EVENT LISTENERS
-// ===========================
-signaturePad.addEventListener("beginStroke", () => {
-    if (currentMode === 'select' || currentMode === 'move' || currentMode === 'resize') return;
-    saveState();
-    hint.classList.add('hidden');
-});
-
-clearBtn.addEventListener('click', () => {
-    signaturePad.clear();
-    hint.classList.remove('hidden');
-});
-
-undoBtn.addEventListener('click', undo);
-redoBtn.addEventListener('click', redo);
-
-// Initialize
-updateHistoryButtons();
-
-// Export for use in other modules
-window.signaturePad = signaturePad;
-window.history = history;
-window.currentMode = currentMode;
-window.currentThickness = currentThickness;
-window.currentStrokeType = currentStrokeType;
-window.currentAlpha = currentAlpha;
-window.lastBaseColor = lastBaseColor;
-window.selectedStrokeIndices = selectedStrokeIndices;
-window.saveState = saveState;
-window.undo = undo;
-window.redo = redo;
-window.updateStrokeStyles = updateStrokeStyles;
-window.applyColor = applyColor;
-window.selectStrokes = selectStrokes;
-window.deselectStroke = deselectStroke;
-window.updateSelectedBounds = updateSelectedBounds;
-window.drawSelectionHighlights = drawSelectionHighlights;
-
-// ===========================
-// WARN BEFORE LEAVING
-// ===========================
-window.addEventListener('beforeunload', (e) => {
-    if (!signaturePad.isEmpty() || history.length > 0) {
-        e.preventDefault();
-        e.returnValue = '';
-    }
-});

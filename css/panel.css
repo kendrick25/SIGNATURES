@@ -86,6 +86,82 @@
     margin-bottom: 0.5rem;
 }
 
+.panel-header-controls {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.panel-title-text {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-main);
+    align-self: center;
+    margin-left: 0.5rem;
+}
+
+.panel-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    border: 1px solid var(--glass-border);
+}
+
+.panel-group-title {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-weight: 700;
+}
+
+.panel-sub-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.panel-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.panel-input-label {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+.panel-row-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.panel-val-text {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: white;
+}
+
+.panel-section-spacing {
+    margin-top: 1rem;
+}
+
+.panel-config-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.panel-lang-container {
+    display: flex;
+    gap: 4px;
+}
+
 .side-panel.minimized .side-panel-header>div,
 .side-panel.minimized #dockBtn {
     display: none !important;
@@ -382,29 +458,4 @@ input:checked+.slider:before {
 .thickness-input::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
-}
-
-/* Stroke Type Styles */
-.stroke-presets {
-    display: flex;
-    gap: 0.25rem;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 4px;
-    border-radius: 10px;
-}
-
-.preset-btn {
-    padding: 0.4rem 0.8rem;
-    border-radius: 8px;
-    font-size: 0.75rem;
-    background: transparent;
-    color: var(--text-dim);
-    border: none;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.preset-btn.active {
-    background: var(--primary);
-    color: white;
 }

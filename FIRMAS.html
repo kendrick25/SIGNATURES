@@ -31,61 +31,25 @@
     <div class="container">
         <!-- Floating Top Bar -->
         <div class="top-bar">
-            <!-- MODOS -->
-            <div class="stroke-presets" id="modeToggle">
-                <button class="preset-btn active" data-mode="draw" title="Modo Dibujo (P)">
-                    <i data-lucide="pencil" size="18"></i>
-                </button>
-                <button class="preset-btn" data-mode="select" title="Modo Selección (V)">
-                    <i data-lucide="mouse-pointer-2" size="18"></i>
-                </button>
-                <button class="preset-btn" data-mode="transform" title="Modo Transformar (T)">
-                    <i data-lucide="move-diagonal" size="18"></i>
-                </button>
-                <button class="preset-btn" data-mode="pan" title="Mover Espacio (H)">
-                    <i data-lucide="hand" size="18"></i>
-                </button>
-            </div>
+            <!-- MODOS (RENDERED BY COMPONENTS.JS) -->
+            <div class="stroke-presets" id="modeToggle"></div>
 
             <div class="tool-separator"></div>
 
-            <!-- UNDO/CLEAR -->
-            <div class="tool-group">
-                <button class="btn-secondary" id="undoBtn" title="Deshacer" style="padding: 0.6rem;" disabled>
-                    <i data-lucide="undo" size="18"></i>
-                </button>
-                <button class="btn-secondary" id="redoBtn" title="Rehacer" style="padding: 0.6rem;" disabled>
-                    <i data-lucide="redo" size="18"></i>
-                </button>
-                <button class="btn-secondary" id="clearBtn" title="Limpiar" style="padding: 0.6rem;">
-                    <i data-lucide="trash-2" size="18"></i>
-                </button>
-            </div>
+            <!-- UNDO/CLEAR (RENDERED BY DATA.JS) -->
+            <div class="tool-group" id="historyTools"></div>
 
             <div class="tool-separator"></div>
 
             <!-- EXPORT ACTIONS -->
             <div class="tool-group">
                 <div class="dropdown" id="exportDropdown">
-                    <button class="btn-primary" id="exportMainBtn" style="padding: 0.6rem 1rem;">
+                    <button class="btn-primary btn-tool-large" id="exportMainBtn">
                         <i data-lucide="download" size="18"></i>
-                        EXPORTAR
-                        <i data-lucide="chevron-down" size="14" style="margin-left: 4px; opacity: 0.7;"></i>
+                        <span data-i18n="export">EXPORTAR</span>
+                        <i data-lucide="chevron-down" size="14" class="icon-chevron"></i>
                     </button>
-                    <div class="dropdown-menu">
-                        <button class="dropdown-item" id="copyPngBtn">
-                            <i data-lucide="copy" size="16"></i>
-                            Copiar PNG al Portapapeles
-                        </button>
-                        <button class="dropdown-item" id="downloadPngBtn">
-                            <i data-lucide="image" size="16"></i>
-                            Descargar como PNG
-                        </button>
-                        <button class="dropdown-item" id="downloadSvgBtn">
-                            <i data-lucide="file-code" size="16"></i>
-                            Descargar como SVG
-                        </button>
-                    </div>
+                    <div class="dropdown-menu"></div>
                 </div>
             </div>
         </div>
@@ -93,13 +57,11 @@
         <!-- Floating Side Panel -->
         <div class="side-panel" id="sidePanel">
             <div class="side-panel-header">
-                <div style="display: flex; gap: 0.25rem;">
+                <div class="panel-header-controls">
                     <button class="panel-toggle-btn" id="dockBtn" title="Acoplar/Flotar">
                         <i data-lucide="layout-sidebar" size="16"></i>
                     </button>
-                    <span id="panelTitle"
-                        style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); align-self: center; margin-left: 0.5rem;">PANEL
-                        DE CONTROL</span>
+                    <span id="panelTitle" class="panel-title-text" data-i18n="panelTitle">PANEL DE CONTROL</span>
                 </div>
                 <button class="panel-toggle-btn" id="minimizeBtn" title="Minimizar (M)">
                     <i data-lucide="palette" size="18" id="minimizeIcon"></i>
@@ -110,66 +72,38 @@
 
 
                 <!-- Group TRAZO -->
-                <div
-                    style="display: flex; flex-direction: column; gap: 1rem; padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 16px; border: 1px solid var(--glass-border);">
-                    <span style="font-size: 0.8rem; color: var(--text-dim); font-weight: 700;"
-                        data-i18n="stroke">TRAZO</span>
+                <div class="panel-group">
+                    <span class="panel-group-title" data-i18n="stroke">TRAZO</span>
 
-                    <div style="display: flex; flex-direction: column; gap: 1.2rem;">
-                        <!-- Estilo (Tabs) -->
-                        <div class="stroke-presets" id="strokeTypePresets"
-                            style="width: 100%; display: flex; justify-content: center; gap: 4px; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 12px; border: 1px solid var(--glass-border);">
-                            <button class="preset-btn active" data-preset="natural" id="btnNatural"
-                                style="font-size: 0.65rem; flex: 1; padding: 0.5rem; justify-content: center;"
-                                data-i18n="natural">Natural</button>
-                            <button class="preset-btn" data-preset="marker" id="btnMarker"
-                                style="font-size: 0.65rem; flex: 1; padding: 0.5rem; justify-content: center;"
-                                data-i18n="marker">Marcador</button>
-                            <button class="preset-btn" data-preset="pen" id="btnPen"
-                                style="font-size: 0.65rem; flex: 1; padding: 0.5rem; justify-content: center;"
-                                data-i18n="pen">Pluma</button>
-                        </div>
+                    <div class="panel-sub-group">
+                        <!-- Estilo (Tabs) - RENDERED BY DATA.JS -->
+                        <div class="stroke-presets-container" id="strokeTypePresets"></div>
 
                         <!-- Previsualización -->
-                        <div class="stroke-preview-container" style="margin-top: 0;">
+                        <div class="stroke-preview-container">
                             <span class="preview-label" data-i18n="preview">PREVISUALIZACIÓN</span>
                             <canvas id="strokePreviewCanvas"></canvas>
                         </div>
 
-                        <!-- Tinta (Color) -->
-                        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-                            <span style="font-size: 0.65rem; color: var(--text-dim); font-weight: 600;"
-                                data-i18n="color">COLOR</span>
-                            <div class="color-picker" id="colorPicker" style="flex-wrap: wrap; gap: 8px;">
-                                <div class="color-dot active" style="background: #ffffff;" data-color="#ffffff"></div>
-                                <div class="color-dot" style="background: #6366f1;" data-color="#6366f1"></div>
-                                <div class="color-dot" style="background: #06b6d4;" data-color="#06b6d4"></div>
-                                <div class="color-dot"
-                                    style="background: #000000; border: 1px solid var(--glass-border);"
-                                    data-color="#000000"></div>
-                                <div class="custom-color-btn" id="customColorBtn" title="Color personalizado">
-                                    <i data-lucide="plus" size="12"></i>
-                                </div>
-                                <input type="color" id="hiddenColorInput" style="display: none;">
-                            </div>
+                        <!-- Tinta (Color) - RENDERED BY DATA.JS -->
+                        <div class="panel-input-group">
+                            <span class="panel-input-label" data-i18n="color">COLOR</span>
+                            <div class="color-picker" id="colorPicker"></div>
                         </div>
 
                         <!-- Opacidad -->
-                        <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-size: 0.65rem; color: var(--text-dim); font-weight: 600;"
-                                    data-i18n="opacity">OPACIDAD</span>
-                                <span id="alphaVal"
-                                    style="font-size: 0.75rem; font-weight: 700; color: white;">100%</span>
+                        <div class="panel-input-group">
+                            <div class="panel-row-header">
+                                <span class="panel-input-label" data-i18n="opacity">OPACIDAD</span>
+                                <span id="alphaVal" class="panel-val-text">100%</span>
                             </div>
                             <input type="range" id="alphaSlider" min="0.1" max="1.0" step="0.05" value="1.0"
-                                style="width: 100%; accent-color: var(--primary); height: 8px; cursor: pointer;">
+                                class="alpha-slider">
                         </div>
 
                         <!-- Grosor -->
-                        <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-                            <span style="font-size: 0.65rem; color: var(--text-dim); font-weight: 600;"
-                                data-i18n="thickness">GROSOR</span>
+                        <div class="panel-input-group">
+                            <span class="panel-input-label" data-i18n="thickness">GROSOR</span>
                             <div class="thickness-control">
                                 <button class="scrub-btn" id="decWidth"><i data-lucide="minus" size="10"></i></button>
                                 <div class="scrub-area" id="thicknessScrubArea">
@@ -179,38 +113,24 @@
                                 <button class="scrub-btn" id="incWidth"><i data-lucide="plus" size="10"></i></button>
                             </div>
                             <input type="range" id="thicknessSlider" min="1" max="20" step="0.1" value="2.5"
-                                style="width: 100%; accent-color: var(--primary); height: 4px;">
+                                class="thickness-slider">
                         </div>
                     </div>
                 </div>
 
                 <!-- Group LIENZO -->
-                <div
-                    style="display: flex; flex-direction: column; gap: 1rem; padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 16px; border: 1px solid var(--glass-border); margin-top: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 0.8rem; color: var(--text-dim); font-weight: 700;"
-                            data-i18n="canvas">LIENZO</span>
+                <div class="panel-group panel-section-spacing">
+                    <div class="panel-row-header">
+                        <span class="panel-group-title" data-i18n="canvas">LIENZO</span>
                     </div>
 
-                    <!-- Size Presets -->
-                    <div class="stroke-presets" id="canvasSizePresets"
-                        style="width: 100%; display: flex; justify-content: center; gap: 4px; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 12px; border: 1px solid var(--glass-border);">
-                        <button class="preset-btn active" data-size="normal"
-                            style="font-size: 0.65rem; flex: 1; padding: 0.5rem; justify-content: center;"
-                            data-i18n="normal">Normal</button>
-                        <button class="preset-btn" data-size="medium"
-                            style="font-size: 0.65rem; flex: 1; padding: 0.5rem; justify-content: center;"
-                            data-i18n="medium">Medio</button>
-                        <button class="preset-btn" data-size="large"
-                            style="font-size: 0.65rem; flex: 1; padding: 0.5rem; justify-content: center;"
-                            data-i18n="large">Grande</button>
-                    </div>
+                    <!-- Size Presets - RENDERED BY DATA.JS -->
+                    <div class="stroke-presets-container" id="canvasSizePresets"></div>
 
-                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div class="panel-sub-group">
                         <!-- Ancho -->
-                        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-                            <span style="font-size: 0.65rem; color: var(--text-dim); font-weight: 600;"
-                                data-i18n="width">ANCHO</span>
+                        <div class="panel-input-group">
+                            <span class="panel-input-label" data-i18n="width">ANCHO</span>
                             <div class="thickness-control">
                                 <button class="scrub-btn" id="decCanvasWidth"><i data-lucide="minus"
                                         size="10"></i></button>
@@ -221,12 +141,11 @@
                                         size="10"></i></button>
                             </div>
                             <input type="range" id="widthSlider" min="200" max="2000" step="10" value="836"
-                                style="width: 100%; accent-color: var(--primary); height: 4px;">
+                                class="canvas-range">
                         </div>
                         <!-- Alto -->
-                        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-                            <span style="font-size: 0.65rem; color: var(--text-dim); font-weight: 600;"
-                                data-i18n="height">ALTO</span>
+                        <div class="panel-input-group">
+                            <span class="panel-input-label" data-i18n="height">ALTO</span>
                             <div class="thickness-control">
                                 <button class="scrub-btn" id="decCanvasHeight"><i data-lucide="minus"
                                         size="10"></i></button>
@@ -237,66 +156,34 @@
                                         size="10"></i></button>
                             </div>
                             <input type="range" id="heightSlider" min="100" max="1000" step="10" value="400"
-                                style="width: 100%; accent-color: var(--primary); height: 4px;">
+                                class="canvas-range">
                         </div>
 
                         <!-- Zoom -->
-                        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-                            <span style="font-size: 0.65rem; color: var(--text-dim); font-weight: 600;"
-                                data-i18n="zoom">ZOOM</span>
+                        <div class="panel-input-group">
+                            <span class="panel-input-label" data-i18n="zoom">ZOOM</span>
                             <div class="thickness-control">
                                 <button class="scrub-btn" id="decZoom"><i data-lucide="minus" size="10"></i></button>
                                 <div class="scrub-area" id="zoomScrubArea">
                                     <input type="number" class="thickness-input" id="zoomVal" value="100" step="1"
                                         min="10" max="500">
-                                    <span style="font-size: 0.7rem; color: var(--text-dim); margin-right: 8px;">%</span>
+                                    <span class="zoom-unit">%</span>
                                 </div>
                                 <button class="scrub-btn" id="incZoom"><i data-lucide="plus" size="10"></i></button>
                             </div>
                             <input type="range" id="zoomSlider" min="10" max="500" step="1" value="100"
-                                style="width: 100%; accent-color: var(--primary); height: 4px;">
+                                class="canvas-range">
                         </div>
                     </div>
                 </div>
 
-                <!-- Group CONFIGURACIÓN -->
-                <div
-                    style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; margin-bottom: 0.5rem;">
-                    <div class="settings-row">
-                        <span class="settings-label" data-i18n="fullscreen">PANTALLA COMPLETA</span>
-                        <button class="panel-toggle-btn" id="fullscreenBtn" style="padding: 2px;">
-                            <i data-lucide="maximize" size="16"></i>
-                        </button>
-                    </div>
-                    <div class="settings-row">
-                        <span class="settings-label" data-i18n="darkMode">MODO OSCURO</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="darkModeToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="settings-row">
-                        <span class="settings-label" data-i18n="language">IDIOMA</span>
-                        <div style="display: flex; gap: 4px;">
-                            <button class="lang-btn active" data-lang="es">ES</button>
-                            <button class="lang-btn" data-lang="en">EN</button>
-                        </div>
-                    </div>
-                </div>
+                <!-- Group CONFIGURACIÓN - RENDERED BY DATA.JS -->
+                <div class="panel-config-group"></div>
             </div>
         </div>
 
         <div class="workspace" id="workspace">
-            <div class="workspace-controls-bottom">
-                <button class="btn-secondary" id="centerCanvasBtn" title="Volver al lienzo">
-                    <i data-lucide="focus" size="14"></i>
-                    RECENTRAR
-                </button>
-                <button class="btn-secondary" id="resetSizeBtn">
-                    <i data-lucide="maximize" size="14"></i>
-                    AJUSTAR AUTOMÁTICAMENTE
-                </button>
-            </div>
+            <div class="workspace-controls-bottom"></div>
 
             <div class="canvas-container" id="canvasContainer">
                 <div class="selected-stroke-info" id="selectionInfo">Trazos Seleccionados: 0</div>
@@ -305,26 +192,28 @@
                     <div class="resize-handle handle-r" id="resizeHandleR" data-type="width"></div>
                     <div class="resize-handle handle-b" id="resizeHandleB" data-type="height"></div>
                     <div class="resize-handle handle-br" id="resizeHandleBR" data-type="both"></div>
+                    <div class="resize-handle handle-rotate" id="rotateHandle" data-type="rotate" title="Rotar"></div>
                 </div>
                 <div class="canvas-hint" id="canvasHint">
-                    <i data-lucide="pen-tool" size="32"
-                        style="margin-bottom: 0.5rem; display: block; margin-left: auto; margin-right: auto;"></i>
-                    Dibuja tu firma aquí<br>
-                    <span style="font-size: 0.7rem;">(Compatible con tabletas digitales)</span>
+                    <i data-lucide="pen-tool" size="32" class="hint-icon"></i>
+                    <span data-i18n="canvasHint">Dibuja tu firma aquí</span><br>
+                    <span class="hint-subtext" data-i18n="canvasHintSub">(Compatible con tabletas digitales)</span>
                 </div>
                 <canvas id="signatureCanvas"></canvas>
-                <canvas id="selectionCanvas"
-                    style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
+                <canvas id="selectionCanvas" class="selection-canvas-layer"></canvas>
             </div>
         </div>
 
-        <div class="toast" id="toast">Firma copiada al portapapeles</div>
+        <div class="toast" id="toast" data-i18n="toastSuccess">Firma copiada al portapapeles</div>
 
-        <!-- JavaScript Modules -->
-        <script src="js/main.js"></script>
+        <!-- Module Scripts -->
+        <script src="js/data.js"></script>
+        <script src="js/init.js"></script>
+        <script src="js/workspace.js"></script>
         <script src="js/canvas.js"></script>
         <script src="js/panel.js"></script>
-        <script src="js/workspace.js"></script>
+        <script src="js/main.js"></script>
+    </div>
 </body>
 
 </html>
