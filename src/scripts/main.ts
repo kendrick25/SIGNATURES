@@ -422,36 +422,49 @@ function handlePointerDown(e: PointerEvent) {
         e.clientX >= rect.left && e.clientX <= rect.right &&
         e.clientY >= rect.top && e.clientY <= rect.bottom
     );
-    const isHandle = (e.target as HTMLElement).classList.contains('resize-handle');
-    if (!isInsideCanvas && !isHandle) return;
+    const handleEl = (e.target as HTMLElement).closest('.resize-handle') as HTMLElement;
+    const isHandle = !!handleEl;
 
-    if ((currentMode === 'select' || currentMode === 'transform') && (isInsideCanvas || isHandle)) {
+    if (isHandle && (currentMode === 'select' || currentMode === 'transform')) {
+        const bounds = getSelectedDataBounds();
+        resizeType = handleEl.dataset.type!;
+        saveState();
+        initialTransformData = JSON.parse(JSON.stringify(signaturePad.toData()));
+        transformPivot = {
+            x: (bounds.minX + bounds.maxX) / 2,
+            y: (bounds.minY + bounds.maxY) / 2,
+            minX: bounds.minX,
+            minY: bounds.minY,
+            width: Math.max(1, bounds.maxX - bounds.minX),
+            height: Math.max(1, bounds.maxY - bounds.minY)
+        };
+
+        if (resizeType === 'rotate') {
+            setRotating(true);
+            rotateStart.angle = Math.atan2(cy - transformPivot.y, cx - transformPivot.x);
+        } else {
+            setResizing(true);
+            resizeStart.x = cx;
+            resizeStart.y = cy;
+        }
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        return;
+    }
+
+    if (!isInsideCanvas) return;
+
+    if ((currentMode === 'select' || currentMode === 'transform')) {
         const bounds = getSelectedDataBounds();
         const clickedOnStroke = isPointNearStrokes(cx, cy, selectedStrokeIndices);
         const clickedInsideSelection = (cx >= bounds.minX && cx <= bounds.maxX && cy >= bounds.minY && cy <= bounds.maxY);
 
-        if (isHandle) {
-            resizeType = (e.target as HTMLElement).dataset.type!;
+        if (clickedOnStroke || (currentMode === 'transform' && clickedInsideSelection)) {
             saveState();
+            setMoving(true);
+            moveStart.x = cx;
+            moveStart.y = cy;
             initialTransformData = JSON.parse(JSON.stringify(signaturePad.toData()));
-            transformPivot = {
-                x: (bounds.minX + bounds.maxX) / 2,
-                y: (bounds.minY + bounds.maxY) / 2,
-                minX: bounds.minX,
-                minY: bounds.minY,
-                width: bounds.maxX - bounds.minX,
-                height: bounds.maxY - bounds.minY
-            };
-
-            if (resizeType === 'rotate') {
-                setRotating(true);
-                rotateStart.angle = Math.atan2(cy - transformPivot.y, cx - transformPivot.x);
-            } else {
-                setResizing(true);
-                resizeStart.x = cx;
-                resizeStart.y = cy;
-            }
-        } else if (clickedOnStroke || (currentMode === 'transform' && clickedInsideSelection)) {
+        } else if (currentMode === 'select') {
             saveState();
             setMoving(true);
             moveStart.x = cx;
@@ -468,6 +481,14 @@ function handlePointerDown(e: PointerEvent) {
             }
         } else if (isInsideCanvas && currentMode === 'transform' && !clickedInsideSelection) {
             findStrokesInArea(cx, cy, cx, cy, e.shiftKey, e.ctrlKey);
+            // If we just selected something, allow immediate move
+            if (isPointNearStrokes(cx, cy, selectedStrokeIndices)) {
+                saveState();
+                setMoving(true);
+                moveStart.x = cx;
+                moveStart.y = cy;
+                initialTransformData = JSON.parse(JSON.stringify(signaturePad.toData()));
+            }
         }
     } else if (currentMode === 'pan') {
         setPanning(true);

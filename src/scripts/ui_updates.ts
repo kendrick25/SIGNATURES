@@ -29,7 +29,7 @@ export function updateSelectedBounds() {
 
     const handles = el.querySelectorAll('.resize-handle') as NodeListOf<HTMLElement>;
     handles.forEach(h => {
-        h.style.transform = `scale(${1 / workspaceScale})`;
+        h.style.setProperty('--handle-scale', (1 / workspaceScale).toString());
     });
 }
 

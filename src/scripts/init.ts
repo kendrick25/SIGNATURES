@@ -112,22 +112,16 @@ function patchSignaturePad(pad: any) {
 
     const original = pad[targetMethod];
     pad[targetMethod] = function (x: number, y: number, pressure: number) {
-        // Original returns {x, y, pressure, time}
         const point = original.call(this, x, y, pressure);
 
         if (point && !isNaN(point.x) && !isNaN(point.y)) {
-            // Correct for workspaceScale to ensure points are stored in Layout Coordinates
-            // We use window.workspaceScale because it's updated globally by workspace.ts
             const currentScale = (window as any).workspaceScale || 1.0;
-            const originalX = point.x;
-            const originalY = point.y;
-            point.x /= currentScale;
-            point.y /= currentScale;
+            // Calculate the internal ratio SignaturePad applied: internal_px / css_px
+            // This accounts for DPI and any resolution scaling we do in resizeCanvas
+            const internalRatio = this.canvas.width / this.canvas.offsetWidth;
 
-            // Log first few points for debugging
-            if (Math.random() < 0.01) { // Log ~1% of points to avoid spam
-                console.log(`Patch: (${originalX.toFixed(1)}, ${originalY.toFixed(1)}) -> (${point.x.toFixed(1)}, ${point.y.toFixed(1)}) @ scale ${currentScale}`);
-            }
+            point.x = (point.x / internalRatio) / currentScale;
+            point.y = (point.y / internalRatio) / currentScale;
         }
         return point;
     };
