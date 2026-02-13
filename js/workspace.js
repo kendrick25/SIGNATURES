@@ -1,6 +1,8 @@
 // workspace.js
 // Handles workspace transformations (pan, zoom) and canvas resizing.
 
+let resizeTimeout;
+
 function updateWorkspaceTransform() {
     container.style.transform = `translate(${workspacePan.x}px, ${workspacePan.y}px) scale(${workspaceScale})`;
 
@@ -9,6 +11,10 @@ function updateWorkspaceTransform() {
     if (zoomVal) {
         zoomVal.innerText = Math.round(workspaceScale * 100) + '%';
     }
+
+    // Debounce resize to avoid lag during rapid zooming
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(resizeCanvas, 200);
 }
 
 function syncSizeValues() {
@@ -29,22 +35,35 @@ function resizeCanvas() {
     const data = signaturePad.toData();
     ratio = Math.max(window.devicePixelRatio || 1, 1);
 
-    const newWidth = container.offsetWidth * ratio;
-    const newHeight = container.offsetHeight * ratio;
+    // Dynamic resolution scaling for "Vector Quality" at any zoom level
+    const effectiveScale = ratio * workspaceScale;
+
+    // Limit max resolution to avoid crashing mobile browsers (e.g., 4k limit approx)
+    // 800px * 5 (500%) * 3 (DPI) = 12000px width! Too big.
+    // Cap at reasonable max spacing approx 4000-5000px?
+    // Let's rely on standard constraints or user sanity mostly, but safety cap is good.
+    const newWidth = Math.min(8000, container.offsetWidth * effectiveScale);
+    const newHeight = Math.min(8000, container.offsetHeight * effectiveScale);
 
     if (canvas.width !== newWidth || canvas.height !== newHeight) {
         canvas.width = newWidth;
         canvas.height = newHeight;
 
         // SignaturePad v5: Use internal context scaling for layout-coordinate points.
-        // This keeps the JSON data resolution-independent and fixes coordinate mapping at all zoom levels.
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.scale(ratio, ratio);
+
+        // We scale the context so that 1 layout unit = effectiveScale pixels
+        // But wait, if we cap width, we must adjust scale?
+        // If we capped, realScale might differ from effectiveScale.
+        const realScaleX = newWidth / container.offsetWidth;
+        const realScaleY = newHeight / container.offsetHeight;
+
+        ctx.scale(realScaleX, realScaleY);
 
         selectionCanvas.width = newWidth;
         selectionCanvas.height = newHeight;
         sctx.setTransform(1, 0, 0, 1, 0, 0);
-        sctx.scale(ratio, ratio);
+        sctx.scale(realScaleX, realScaleY);
 
         signaturePad.clear();
         if (data.length > 0) {

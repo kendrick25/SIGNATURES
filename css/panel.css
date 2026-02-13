@@ -452,6 +452,8 @@ input:checked+.slider:before {
     font-size: 0.9rem;
     padding: 2px 0;
     font-family: inherit;
+    outline: none;
+    /* Removed default focus border */
 }
 
 .thickness-input::-webkit-inner-spin-button,

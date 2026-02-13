@@ -78,6 +78,8 @@ function updateThickness(newVal) {
                 let min, max;
                 if (currentStrokeType === 'marker') { min = currentThickness; max = currentThickness; }
                 else if (currentStrokeType === 'pen') { min = currentThickness * 0.15; max = currentThickness * 3.0; }
+                else if (currentStrokeType === 'brush') { min = currentThickness * 0.1; max = currentThickness * 4.0; }
+                else if (currentStrokeType === 'fine') { min = currentThickness * 0.9; max = currentThickness * 1.1; }
                 else { min = currentThickness * 0.45; max = currentThickness * 2.0; }
                 data[index].minWidth = min;
                 data[index].maxWidth = max;
@@ -104,6 +106,16 @@ function updateStrokeStyles() {
             signaturePad.maxWidth = currentThickness * 3.0;
             signaturePad.velocityFilterWeight = 0.45;
             break;
+        case 'brush':
+            signaturePad.minWidth = currentThickness * 0.1;
+            signaturePad.maxWidth = currentThickness * 4.0;
+            signaturePad.velocityFilterWeight = 0.5;
+            break;
+        case 'fine':
+            signaturePad.minWidth = currentThickness * 0.9;
+            signaturePad.maxWidth = currentThickness * 1.1;
+            signaturePad.velocityFilterWeight = 0.8;
+            break;
         case 'natural':
         default:
             signaturePad.minWidth = currentThickness * 0.45;
@@ -124,6 +136,8 @@ function applyStrokeType(type) {
                 let min, max;
                 if (currentStrokeType === 'marker') { min = currentThickness; max = currentThickness; }
                 else if (currentStrokeType === 'pen') { min = currentThickness * 0.15; max = currentThickness * 3.0; }
+                else if (currentStrokeType === 'brush') { min = currentThickness * 0.1; max = currentThickness * 4.0; }
+                else if (currentStrokeType === 'fine') { min = currentThickness * 0.9; max = currentThickness * 1.1; }
                 else { min = currentThickness * 0.45; max = currentThickness * 2.0; }
                 data[index].minWidth = min;
                 data[index].maxWidth = max;
@@ -196,6 +210,8 @@ function updateStrokePreview() {
     let minW, maxW;
     if (currentStrokeType === 'marker') { minW = currentThickness; maxW = currentThickness; }
     else if (currentStrokeType === 'pen') { minW = currentThickness * 0.3; maxW = currentThickness * 2.5; }
+    else if (currentStrokeType === 'brush') { minW = currentThickness * 0.1; maxW = currentThickness * 4.0; }
+    else if (currentStrokeType === 'fine') { minW = currentThickness * 0.9; maxW = currentThickness * 1.1; }
     else { minW = currentThickness * 0.6; maxW = currentThickness * 1.8; }
 
     const points = 40;

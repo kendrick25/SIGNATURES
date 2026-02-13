@@ -25,16 +25,85 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Control Listeners ---
 
-    // Thickness
+    // Continuous increment/decrement helper with touch support
+    function setupContinuousClick(btnId, action) {
+        let interval = null;
+        let timeout = null;
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+
+        const start = (e) => {
+            if (e.type === 'mousedown' && e.button !== 0) return;
+            e.preventDefault();
+            action();
+            timeout = setTimeout(() => {
+                interval = setInterval(action, 60);
+            }, 400);
+        };
+
+        const stop = () => {
+            clearTimeout(timeout);
+            clearInterval(interval);
+        };
+
+        btn.addEventListener('mousedown', start);
+        btn.addEventListener('touchstart', start, { passive: false });
+        window.addEventListener('mouseup', stop);
+        window.addEventListener('touchend', stop);
+        btn.addEventListener('mouseleave', stop);
+    }
+
+    // Interactive Scrubbing (Click & Drag) for numeric inputs
+    function setupScrubbing(areaId, getValue, setValue, step = 1) {
+        const area = document.getElementById(areaId);
+        if (!area) return;
+
+        let startX = 0;
+        let startVal = 0;
+
+        const onMove = (e) => {
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const delta = (clientX - startX) * step;
+            setValue(startVal + delta);
+        };
+
+        const onEnd = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('touchmove', onMove);
+            window.removeEventListener('mouseup', onEnd);
+            window.removeEventListener('touchend', onEnd);
+            document.body.style.cursor = 'default';
+        };
+
+        const onStart = (e) => {
+            if (e.type === 'mousedown' && e.button !== 0) return;
+            if (e.target.classList.contains('thickness-input')) return;
+
+            startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            startVal = getValue();
+
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('touchmove', onMove, { passive: false });
+            window.addEventListener('mouseup', onEnd);
+            window.addEventListener('touchend', onEnd);
+            document.body.style.cursor = 'ew-resize';
+        };
+
+        area.addEventListener('mousedown', onStart);
+        area.addEventListener('touchstart', onStart, { passive: false });
+    }
+
+    // 1. Thickness / Grosor
     const thicknessSlider = document.getElementById('thicknessSlider');
     const thicknessVal = document.getElementById('thicknessVal');
     if (thicknessSlider) thicknessSlider.addEventListener('input', (e) => updateThickness(e.target.value));
     if (thicknessVal) thicknessVal.addEventListener('change', (e) => updateThickness(e.target.value));
 
-    document.getElementById('incWidth')?.addEventListener('click', () => updateThickness(currentThickness + 0.5));
-    document.getElementById('decWidth')?.addEventListener('click', () => updateThickness(currentThickness - 0.5));
+    setupContinuousClick('incWidth', () => updateThickness(currentThickness + 0.1));
+    setupContinuousClick('decWidth', () => updateThickness(currentThickness - 0.1));
+    setupScrubbing('thicknessScrubArea', () => currentThickness, (v) => updateThickness(v), 0.1);
 
-    // Alpha
+    // 2. Alpha / Opacidad
     const alphaSlider = document.getElementById('alphaSlider');
     const alphaVal = document.getElementById('alphaVal');
     if (alphaSlider) {
@@ -45,46 +114,59 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Canvas Size
+    // 3. Canvas Size / Lienzo
     const widthSlider = document.getElementById('widthSlider');
     const heightSlider = document.getElementById('heightSlider');
     const widthVal = document.getElementById('canvasWidthVal');
     const heightVal = document.getElementById('canvasHeightVal');
 
     const updateCanvasW = (w) => {
-        container.style.width = w + 'px';
+        const val = Math.max(200, Math.min(2000, parseInt(w)));
+        container.style.width = val + 'px';
+        if (widthVal) widthVal.value = val;
+        if (widthSlider) widthSlider.value = val;
         syncSizeValues();
         resizeCanvas();
     }
     const updateCanvasH = (h) => {
-        container.style.height = h + 'px';
+        const val = Math.max(100, Math.min(1000, parseInt(h)));
+        container.style.height = val + 'px';
+        if (heightVal) heightVal.value = val;
+        if (heightSlider) heightSlider.value = val;
         syncSizeValues();
         resizeCanvas();
     }
 
     widthSlider?.addEventListener('input', (e) => updateCanvasW(e.target.value));
     widthVal?.addEventListener('change', (e) => updateCanvasW(e.target.value));
-    document.getElementById('incCanvasWidth')?.addEventListener('click', () => updateCanvasW(container.offsetWidth + 50));
-    document.getElementById('decCanvasWidth')?.addEventListener('click', () => updateCanvasW(container.offsetWidth - 50));
+    setupContinuousClick('incCanvasWidth', () => updateCanvasW(container.offsetWidth + 10));
+    setupContinuousClick('decCanvasWidth', () => updateCanvasW(container.offsetWidth - 10));
+    setupScrubbing('widthScrubArea', () => container.offsetWidth, (v) => updateCanvasW(v), 2);
 
     heightSlider?.addEventListener('input', (e) => updateCanvasH(e.target.value));
     heightVal?.addEventListener('change', (e) => updateCanvasH(e.target.value));
-    document.getElementById('incCanvasHeight')?.addEventListener('click', () => updateCanvasH(container.offsetHeight + 50));
-    document.getElementById('decCanvasHeight')?.addEventListener('click', () => updateCanvasH(container.offsetHeight - 50));
+    setupContinuousClick('incCanvasHeight', () => updateCanvasH(container.offsetHeight + 10));
+    setupContinuousClick('decCanvasHeight', () => updateCanvasH(container.offsetHeight - 10));
+    setupScrubbing('heightScrubArea', () => container.offsetHeight, (v) => updateCanvasH(v), 2);
 
-    // Zoom
+    // 4. Zoom
     const zoomSlider = document.getElementById('zoomSlider');
     const zoomValInput = document.getElementById('zoomVal');
 
     const updateZoom = (z) => {
-        workspaceScale = z / 100;
+        const val = Math.max(10, Math.min(500, parseInt(z)));
+        workspaceScale = val / 100;
+        if (zoomValInput) zoomValInput.value = val;
+        if (zoomSlider) zoomSlider.value = val;
         updateWorkspaceTransform();
     }
 
     zoomSlider?.addEventListener('input', (e) => updateZoom(e.target.value));
     zoomValInput?.addEventListener('change', (e) => updateZoom(e.target.value));
-    document.getElementById('incZoom')?.addEventListener('click', () => updateZoom((workspaceScale * 100) + 10));
-    document.getElementById('decZoom')?.addEventListener('click', () => updateZoom((workspaceScale * 100) - 10));
+
+    setupContinuousClick('incZoom', () => updateZoom((workspaceScale * 100) + 1));
+    setupContinuousClick('decZoom', () => updateZoom((workspaceScale * 100) - 1));
+    setupScrubbing('zoomScrubArea', () => workspaceScale * 100, (v) => updateZoom(v), 1);
 
     function attachDynamicListeners() {
         // Modes

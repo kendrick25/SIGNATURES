@@ -147,6 +147,11 @@ button:disabled {
     pointer-events: none;
 }
 
+button:focus,
+input:focus {
+    outline: none;
+}
+
 /* Toast */
 .toast {
     position: fixed;
@@ -271,9 +276,9 @@ button:disabled {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.5rem;
+    padding: 0.5rem 0.25rem;
     border-radius: 10px;
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.02em;
@@ -282,8 +287,11 @@ button:disabled {
     border: none;
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    white-space: nowrap;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.1;
     min-width: 0;
+    overflow: hidden;
 }
 
 .preset-btn:hover {

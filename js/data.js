@@ -28,6 +28,8 @@ const i18n = {
         natural: "Natural",
         marker: "Marcador",
         pen: "Pluma",
+        brush: "Pincel",
+        fine: "Fino",
         preview: "PREVISUALIZACIÓN",
         color: "COLOR",
         opacity: "OPACIDAD",
@@ -89,6 +91,8 @@ const i18n = {
         natural: "Natural",
         marker: "Marker",
         pen: "Pen",
+        brush: "Brush",
+        fine: "Fine",
         preview: "PREVIEW",
         color: "COLOR",
         opacity: "OPACITY",
@@ -139,9 +143,11 @@ const UI_CONFIG = {
         { id: 'clearBtn', icon: 'trash-2', i18nKey: 'clear' }
     ],
     strokePresets: [
+        { id: 'fine', preset: 'fine', key: 'fine' },
         { id: 'natural', preset: 'natural', key: 'natural' },
         { id: 'marker', preset: 'marker', key: 'marker' },
-        { id: 'pen', preset: 'pen', key: 'pen' }
+        { id: 'pen', preset: 'pen', key: 'pen' },
+        { id: 'brush', preset: 'brush', key: 'brush' }
     ],
     colors: [
         { color: '#ffffff', active: true },
