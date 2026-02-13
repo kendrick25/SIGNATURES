@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStrokePreview();
     updateHistoryButtons();
     resizeCanvas();
-    setupExportHandlers();
+    // setupExportHandlers is called within attachDynamicListeners below
 
     // Set initial mode
     setMode('draw');
@@ -296,14 +296,14 @@ document.addEventListener('DOMContentLoaded', () => {
 function getCanvasCoordinates(e) {
     const rect = canvas.getBoundingClientRect();
 
-    // Scale factor between screen pixels and canvas 'layout' pixels
-    // rect.width is the scaled screen width, (canvas.width / ratio) is the layout width
-    const scaleX = rect.width / (canvas.width / ratio);
-    const scaleY = rect.height / (canvas.height / ratio);
+    // Get client coordinates from mouse, pointer, or touch event
+    const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    const clientY = e.clientY ?? (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
 
+    // layout_pixel = (screen_pixel - origin) / scale
     return {
-        x: (e.clientX - rect.left) / scaleX,
-        y: (e.clientY - rect.top) / scaleY
+        x: (clientX - rect.left) / workspaceScale,
+        y: (clientY - rect.top) / workspaceScale
     };
 }
 
@@ -315,7 +315,11 @@ function logicToClient(val) {
 
 // --- Interaction Handlers ---
 
-window.addEventListener('mousedown', (e) => {
+// Use pointer events for higher precision and touch support
+window.addEventListener('pointerdown', (e) => {
+    // Check if clicking on UI elements (buttons, panels)
+    if (e.target.closest('.side-panel') || e.target.closest('.top-bar') || e.target.closest('.workspace-controls-bottom')) return;
+
     // Middle click always pans
     if (e.button === 1) {
         modeBeforeMiddleClick = currentMode;
@@ -385,7 +389,7 @@ window.addEventListener('mousedown', (e) => {
     }
 });
 
-window.addEventListener('mousemove', (e) => {
+window.addEventListener('pointermove', (e) => {
     if (isPanning) {
         workspacePan.x += (e.clientX - panStart.x);
         workspacePan.y += (e.clientY - panStart.y);
@@ -467,7 +471,7 @@ window.addEventListener('mousemove', (e) => {
     }
 });
 
-window.addEventListener('mouseup', (e) => {
+window.addEventListener('pointerup', (e) => {
     if (isPanning) {
         isPanning = false;
         if (modeBeforeMiddleClick) {
@@ -504,10 +508,11 @@ function getSelectedDataBounds() {
 
 function isPointNearStrokes(cx, cy, indices) {
     const data = signaturePad.toData();
+    const hitSlop = 10 / workspaceScale; // 10 actual screen pixels of slack
     return indices.some(idx => {
         const stroke = data[idx];
         if (!stroke) return false;
-        const radius = (stroke.maxWidth + stroke.minWidth) / 2 + 10;
+        const radius = (stroke.maxWidth + stroke.minWidth) / 2 + hitSlop;
         return stroke.points.some(p => Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2) < radius);
     });
 }
@@ -515,15 +520,16 @@ function isPointNearStrokes(cx, cy, indices) {
 function findStrokesInArea(x1, y1, x2, y2, shift, ctrl) {
     const data = signaturePad.toData();
     const found = [];
-    const isClick = Math.abs(x2 - x1) < 10 && Math.abs(y2 - y1) < 10;
+    const isClick = (Math.abs(x2 - x1) * workspaceScale) < 5 && (Math.abs(y2 - y1) * workspaceScale) < 5;
     const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
 
     data.forEach((stroke, idx) => {
         let match = false;
-        const radius = (stroke.maxWidth + stroke.minWidth) / 2 + 5;
+        const hitSlop = 5 / workspaceScale; // 5 actual screen pixels of slack
+        const radius = (stroke.maxWidth + stroke.minWidth) / 2 + hitSlop;
         stroke.points.forEach(p => {
             if (isClick) {
-                if (Math.sqrt((p.x - midX) ** 2 + (p.y - midY) ** 2) < radius + 10) match = true;
+                if (Math.sqrt((p.x - midX) ** 2 + (p.y - midY) ** 2) < radius + (10 / workspaceScale)) match = true;
             } else {
                 const left = Math.min(x1, x2), right = Math.max(x1, x2);
                 const top = Math.min(y1, y2), bottom = Math.max(y1, y2);
@@ -592,8 +598,16 @@ function updateSelectedBounds() {
         el.style.border = 'none'; el.style.opacity = '0';
     } else {
         el.classList.remove('no-handles');
-        el.style.border = '1px dashed var(--primary)'; el.style.opacity = '1';
+        el.style.border = `${1 / workspaceScale}px dashed var(--primary)`; el.style.opacity = '1';
     }
+
+    // Keep handles a consistent screen size
+    const handles = el.querySelectorAll('.resize-handle');
+    handles.forEach(h => {
+        h.style.transform = `scale(${1 / workspaceScale})`;
+        // Compensate for scale in positioning if needed, but handles use -6px/-8px margins
+        // which will also be scaled. For perfection, we'd adjust those, but scale(1/s) usually suffice.
+    });
 }
 
 function drawSelectionHighlights() {

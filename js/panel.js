@@ -83,18 +83,29 @@ function setupExportHandlers() {
     const exportMainBtn = document.getElementById('exportMainBtn');
     if (!exportDropdown || !exportMainBtn) return;
 
+    // Ensure listeners are only attached once to static elements
+    if (exportMainBtn.dataset.initialized) return;
+
     exportMainBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         exportDropdown.classList.toggle('active');
     });
 
-    document.addEventListener('click', () => {
-        exportDropdown.classList.remove('active');
+    document.addEventListener('click', (e) => {
+        if (!exportDropdown.contains(e.target)) {
+            exportDropdown.classList.remove('active');
+        }
     });
 
-    const copyPngBtn = document.getElementById('copyPngBtn');
-    if (copyPngBtn) {
-        copyPngBtn.addEventListener('click', async () => {
+    // Use event delegation for items inside the dropdown
+    // This handles copyPngBtn, downloadPngBtn, downloadSvgBtn even if they are re-rendered
+    exportDropdown.addEventListener('click', async (e) => {
+        const item = e.target.closest('.dropdown-item');
+        if (!item) return;
+
+        const btnId = item.id;
+
+        if (btnId === 'copyPngBtn') {
             if (signaturePad.isEmpty()) {
                 showToast(i18n[currentLang].toastSignFirst, "#ef4444");
                 return;
@@ -109,12 +120,7 @@ function setupExportHandlers() {
                 console.error(err);
                 showToast(i18n[currentLang].toastError, "#ef4444");
             }
-        });
-    }
-
-    const downloadPngBtn = document.getElementById('downloadPngBtn');
-    if (downloadPngBtn) {
-        downloadPngBtn.addEventListener('click', () => {
+        } else if (btnId === 'downloadPngBtn') {
             if (signaturePad.isEmpty()) {
                 showToast(i18n[currentLang].toastSignFirst, "#ef4444");
                 return;
@@ -125,12 +131,7 @@ function setupExportHandlers() {
             link.download = 'firma.png';
             link.click();
             showToast(i18n[currentLang].toastPngDownloaded);
-        });
-    }
-
-    const downloadSvgBtn = document.getElementById('downloadSvgBtn');
-    if (downloadSvgBtn) {
-        downloadSvgBtn.addEventListener('click', () => {
+        } else if (btnId === 'downloadSvgBtn') {
             if (signaturePad.isEmpty()) {
                 showToast(i18n[currentLang].toastSignFirst, "#ef4444");
                 return;
@@ -146,6 +147,8 @@ function setupExportHandlers() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
             showToast(i18n[currentLang].toastSvgDownloaded);
-        });
-    }
+        }
+    });
+
+    exportMainBtn.dataset.initialized = 'true';
 }
