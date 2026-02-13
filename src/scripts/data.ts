@@ -1,29 +1,23 @@
-// data.js
-// i18n content ordered by its appearance in FIRMAS.html
+import { createIcons as lucideCreateIcons, icons } from 'lucide';
+import { currentLang, UIConfig, I18nContent, setDynamicRefs } from '@/scripts/state';
 
-const i18n = {
+// ... (skipping i18n and UI_CONFIG constant definitions which are huge)
+
+
+export const i18n: I18nContent = {
     es: {
-        // --- MODOS ---
         drawMode: "Modo Dibujo (P)",
         selectMode: "Modo Selección (V)",
         transformMode: "Modo Transformar (T)",
         panMode: "Mover Espacio (H)",
-
-        // --- UNDO/CLEAR ---
         undo: "Deshacer",
         redo: "Rehacer",
         clear: "Limpiar",
-
-        // --- EXPORT ACTIONS ---
         export: "EXPORTAR",
         copyPng: "Copiar PNG al Portapapeles",
         downloadPng: "Descargar como PNG",
         downloadSvg: "Descargar como SVG",
-
-        // --- PANEL DE CONTROL ---
         panelTitle: "PANEL DE CONTROL",
-
-        // --- TRAZO ---
         stroke: "TRAZO",
         natural: "Natural",
         marker: "Marcador",
@@ -34,8 +28,6 @@ const i18n = {
         color: "COLOR",
         opacity: "OPACIDAD",
         thickness: "GROSOR",
-
-        // --- LIENZO ---
         canvas: "LIENZO",
         normal: "Normal",
         medium: "Medio",
@@ -43,19 +35,13 @@ const i18n = {
         width: "ANCHO",
         height: "ALTO",
         zoom: "ZOOM",
-
-        // --- CONFIGURACIÓN ---
         fullscreen: "PANTALLA COMPLETA",
         darkMode: "MODO OSCURO",
         language: "IDIOMA",
-
-        // --- WORKSPACE ---
         recenter: "RECENTRAR",
         autoAdjust: "AJUSTAR AUTOMÁTICAMENTE",
         canvasHint: "Dibuja tu firma aquí",
         canvasHintSub: "(Compatible con tabletas digitales)",
-
-        // --- OTROS ---
         toastSuccess: "Firma copiada al portapapeles",
         toastError: "Error al copiar PNG",
         toastSignFirst: "Por favor, firma primero",
@@ -66,27 +52,18 @@ const i18n = {
         toastPngCopied: "Firma copiada como PNG"
     },
     en: {
-        // --- MODOS ---
         drawMode: "Drawing Mode (P)",
         selectMode: "Selection Mode (V)",
         transformMode: "Transform Mode (T)",
         panMode: "Pan Workspace (H)",
-
-        // --- UNDO/CLEAR ---
         undo: "Undo",
         redo: "Redo",
         clear: "Clear",
-
-        // --- EXPORT ACTIONS ---
         export: "EXPORT",
         copyPng: "Copy PNG to Clipboard",
         downloadPng: "Download as PNG",
         downloadSvg: "Download as SVG",
-
-        // --- PANEL DE CONTROL ---
         panelTitle: "CONTROL PANEL",
-
-        // --- TRAZO ---
         stroke: "STROKE",
         natural: "Natural",
         marker: "Marker",
@@ -97,8 +74,6 @@ const i18n = {
         color: "COLOR",
         opacity: "OPACITY",
         thickness: "THICKNESS",
-
-        // --- LIENZO ---
         canvas: "CANVAS",
         normal: "Normal",
         medium: "Medium",
@@ -106,19 +81,13 @@ const i18n = {
         width: "WIDTH",
         height: "HEIGHT",
         zoom: "ZOOM",
-
-        // --- CONFIGURACIÓN ---
         fullscreen: "FULL SCREEN",
         darkMode: "DARK MODE",
         language: "LANGUAGE",
-
-        // --- WORKSPACE ---
         recenter: "RECENTER",
         autoAdjust: "AUTO ADJUST",
         canvasHint: "Draw your signature here",
         canvasHintSub: "(Tablet compatible)",
-
-        // --- OTROS ---
         toastSuccess: "Signature copied to clipboard",
         toastError: "Error copying PNG",
         toastSignFirst: "Please sign first",
@@ -130,17 +99,17 @@ const i18n = {
     }
 };
 
-const UI_CONFIG = {
+export const UI_CONFIG: UIConfig = {
     modes: [
-        { id: 'draw', icon: 'pencil', titleKey: 'drawMode', shortcut: 'P' },
-        { id: 'select', icon: 'mouse-pointer-2', titleKey: 'selectMode', shortcut: 'V' },
-        { id: 'transform', icon: 'move-diagonal', titleKey: 'transformMode', shortcut: 'T' },
-        { id: 'pan', icon: 'hand', titleKey: 'panMode', shortcut: 'H' }
+        { id: 'draw', icon: 'Pencil', titleKey: 'drawMode', shortcut: 'P' },
+        { id: 'select', icon: 'MousePointer2', titleKey: 'selectMode', shortcut: 'V' },
+        { id: 'transform', icon: 'MoveDiagonal', titleKey: 'transformMode', shortcut: 'T' },
+        { id: 'pan', icon: 'Hand', titleKey: 'panMode', shortcut: 'H' }
     ],
     tools: [
-        { id: 'undoBtn', icon: 'undo', i18nKey: 'undo', disabled: true },
-        { id: 'redoBtn', icon: 'redo', i18nKey: 'redo', disabled: true },
-        { id: 'clearBtn', icon: 'trash-2', i18nKey: 'clear' }
+        { id: 'undoBtn', icon: 'Undo', i18nKey: 'undo', disabled: true },
+        { id: 'redoBtn', icon: 'Redo', i18nKey: 'redo', disabled: true },
+        { id: 'clearBtn', icon: 'Trash2', i18nKey: 'clear' }
     ],
     strokePresets: [
         { id: 'fine', preset: 'fine', key: 'fine' },
@@ -165,24 +134,22 @@ const UI_CONFIG = {
         { id: 'en', label: 'EN' }
     ],
     workspaceShortcuts: [
-        { id: 'centerCanvasBtn', icon: 'focus', i18nKey: 'recenter', titleKey: 'recenter' },
-        { id: 'resetSizeBtn', icon: 'maximize', i18nKey: 'autoAdjust' }
+        { id: 'centerCanvasBtn', icon: 'Focus', i18nKey: 'recenter', titleKey: 'recenter' },
+        { id: 'resetSizeBtn', icon: 'Maximize', i18nKey: 'autoAdjust' }
     ],
     exportOptions: [
-        { id: 'copyPngBtn', icon: 'copy', i18nKey: 'copyPng' },
-        { id: 'downloadPngBtn', icon: 'image', i18nKey: 'downloadPng' },
-        { id: 'downloadSvgBtn', icon: 'file-code', i18nKey: 'downloadSvg' }
+        { id: 'copyPngBtn', icon: 'Copy', i18nKey: 'copyPng' },
+        { id: 'downloadPngBtn', icon: 'Image', i18nKey: 'downloadPng' },
+        { id: 'downloadSvgBtn', icon: 'FileCode', i18nKey: 'downloadSvg' }
     ],
     settings: [
-        { id: 'fullscreenRow', i18nKey: 'fullscreen', type: 'button', btnId: 'fullscreenBtn', icon: 'maximize' },
+        { id: 'fullscreenRow', i18nKey: 'fullscreen', type: 'button', btnId: 'fullscreenBtn', icon: 'Maximize' },
         { id: 'darkModeRow', i18nKey: 'darkMode', type: 'toggle', toggleId: 'darkModeToggle' },
         { id: 'languageRow', i18nKey: 'language', type: 'container', class: 'panel-lang-container' }
     ]
 };
 
-// --- RENDER ENGINE ---
-
-function renderUIComponents() {
+export function renderUIComponents() {
     renderModes();
     renderTools();
     renderExportOptions();
@@ -192,17 +159,33 @@ function renderUIComponents() {
     renderSettings();
     renderWorkspaceShortcuts();
     renderLanguageButtons();
+
+    // Initial icon creation
+    createIcons();
+}
+
+export function createIcons() {
+    try {
+        if (typeof lucideCreateIcons === 'function') {
+            lucideCreateIcons({ icons });
+        } else {
+            console.warn("Lucide createIcons is not a function:", lucideCreateIcons);
+        }
+    } catch (e) {
+        console.error("Failed to create icons:", e);
+    }
 }
 
 function renderModes() {
     const container = document.getElementById('modeToggle');
     if (!container) return;
+    const lang = currentLang as keyof I18nContent;
 
     container.innerHTML = UI_CONFIG.modes.map(mode => `
         <button class="preset-btn ${mode.id === 'draw' ? 'active' : ''}" 
                 data-mode="${mode.id}" 
-                title="${i18n[currentLang][mode.titleKey]}">
-            <i data-lucide="${mode.icon}" size="18"></i>
+                title="${i18n[lang] ? i18n[lang][mode.titleKey] : mode.id}">
+            <i data-lucide="${mode.icon}"></i>
         </button>
     `).join('');
 }
@@ -216,7 +199,7 @@ function renderTools() {
                 id="${tool.id}" 
                 data-i18n="${tool.i18nKey}" 
                 ${tool.disabled ? 'disabled' : ''}>
-            <i data-lucide="${tool.icon}" size="18"></i>
+            <i data-lucide="${tool.icon}"></i>
         </button>
     `).join('');
 }
@@ -224,11 +207,12 @@ function renderTools() {
 function renderExportOptions() {
     const container = document.querySelector('#exportDropdown .dropdown-menu');
     if (!container) return;
+    const lang = currentLang as keyof I18nContent;
 
     container.innerHTML = UI_CONFIG.exportOptions.map(opt => `
         <button class="dropdown-item" id="${opt.id}">
-            <i data-lucide="${opt.icon}" size="16"></i>
-            <span data-i18n="${opt.i18nKey}">${i18n[currentLang][opt.i18nKey]}</span>
+            <i data-lucide="${opt.icon}"></i>
+            <span data-i18n="${opt.i18nKey}">${i18n[lang] ? i18n[lang][opt.i18nKey] : opt.id}</span>
         </button>
     `).join('');
 }
@@ -236,13 +220,14 @@ function renderExportOptions() {
 function renderStrokePresets() {
     const container = document.getElementById('strokeTypePresets');
     if (!container) return;
+    const lang = currentLang as keyof I18nContent;
 
     container.innerHTML = UI_CONFIG.strokePresets.map(preset => `
         <button class="preset-btn ${preset.id === 'natural' ? 'active' : ''} preset-btn-flex" 
                 data-preset="${preset.id}" 
                 id="btn${preset.id.charAt(0).toUpperCase() + preset.id.slice(1)}"
                 data-i18n="${preset.key}">
-            ${i18n[currentLang][preset.key]}
+            ${i18n[lang] ? i18n[lang][preset.key] : preset.id}
         </button>
     `).join('');
 }
@@ -260,7 +245,7 @@ function renderColorPicker() {
     container.innerHTML = `
         ${dots}
         <div class="custom-color-btn" id="customColorBtn" title="Color personalizado">
-            <i data-lucide="plus" size="12"></i>
+            <i data-lucide="Plus"></i>
         </div>
         <input type="color" id="hiddenColorInput" style="display: none;">
     `;
@@ -269,12 +254,13 @@ function renderColorPicker() {
 function renderCanvasPresets() {
     const container = document.getElementById('canvasSizePresets');
     if (!container) return;
+    const lang = currentLang as keyof I18nContent;
 
     container.innerHTML = UI_CONFIG.canvasPresets.map(preset => `
         <button class="preset-btn ${preset.active ? 'active' : ''} preset-btn-flex" 
                 data-size="${preset.size}" 
                 data-i18n="${preset.key}">
-            ${i18n[currentLang][preset.key]}
+            ${i18n[lang] ? i18n[lang][preset.key] : preset.id}
         </button>
     `).join('');
 }
@@ -294,20 +280,23 @@ function renderLanguageButtons() {
 function renderSettings() {
     const container = document.querySelector('.panel-config-group');
     if (!container) return;
+    const lang = currentLang as keyof I18nContent;
+    const isDark = document.body.classList.contains('dark-mode') || !document.body.classList.contains('light-mode');
 
     container.innerHTML = UI_CONFIG.settings.map(s => {
         let control = '';
         if (s.type === 'button') {
-            control = `<button class="panel-toggle-btn" id="${s.btnId}"><i data-lucide="${s.icon}" size="16"></i></button>`;
+            control = `<button class="panel-toggle-btn" id="${s.btnId}"><i data-lucide="${s.icon}"></i></button>`;
         } else if (s.type === 'toggle') {
-            control = `<label class="toggle-switch"><input type="checkbox" id="${s.toggleId}" checked><span class="slider"></span></label>`;
+            const checked = (s.id === 'darkModeRow' && isDark) ? 'checked' : '';
+            control = `<label class="toggle-switch"><input type="checkbox" id="${s.toggleId}" ${checked}><span class="slider"></span></label>`;
         } else if (s.type === 'container') {
             control = `<div class="${s.class}"></div>`;
         }
 
         return `
             <div class="settings-row" id="${s.id}">
-                <span class="settings-label" data-i18n="${s.i18nKey}">${i18n[currentLang][s.i18nKey]}</span>
+                <span class="settings-label" data-i18n="${s.i18nKey}">${(i18n[lang] && i18n[lang][s.i18nKey]) ? i18n[lang][s.i18nKey] : s.i18nKey}</span>
                 ${control}
             </div>
         `;
@@ -317,17 +306,34 @@ function renderSettings() {
 function renderWorkspaceShortcuts() {
     const container = document.querySelector('.workspace-controls-bottom');
     if (!container) return;
+    const lang = currentLang as keyof I18nContent;
 
     container.innerHTML = UI_CONFIG.workspaceShortcuts.map(s => `
-        <button class="btn-secondary" id="${s.id}" ${s.titleKey ? `title="${i18n[currentLang][s.titleKey]}"` : ''} data-i18n="${s.i18nKey}">
-            <i data-lucide="${s.icon}" size="14"></i>
-            ${i18n[currentLang][s.i18nKey]}
+        <button class="btn-secondary" id="${s.id}" ${s.titleKey ? `title="${(i18n[lang] && i18n[lang][s.titleKey]) ? i18n[lang][s.titleKey] : s.titleKey}"` : ''} data-i18n="${s.i18nKey}">
+            <i data-lucide="${s.icon}"></i>
+            ${(i18n[lang] && i18n[lang][s.i18nKey]) ? i18n[lang][s.i18nKey] : s.i18nKey}
         </button>
     `).join('');
 }
 
-function updateGlobalReferences() {
-    colorDots = document.querySelectorAll('.color-dot');
-    strokeTypeBtns = document.querySelectorAll('#strokeTypePresets .preset-btn');
-    modeBtns = document.querySelectorAll('#modeToggle .preset-btn');
+export function updateGlobalReferences() {
+    setDynamicRefs({
+        colorDots: document.querySelectorAll('.color-dot'),
+        strokeTypeBtns: document.querySelectorAll('#strokeTypePresets .preset-btn'),
+        modeBtns: document.querySelectorAll('#modeToggle .preset-btn')
+    });
+}
+
+export function updateLanguage(lang: string) {
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (key && i18n[lang] && i18n[lang][key]) {
+            if (el.tagName === 'INPUT' && (el as HTMLInputElement).placeholder) {
+                (el as HTMLInputElement).placeholder = i18n[lang][key];
+            } else {
+                el.textContent = i18n[lang][key];
+            }
+        }
+    });
 }

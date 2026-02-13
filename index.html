@@ -13,41 +13,22 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;600;700&display=swap"
         rel="stylesheet">
-
-    <!-- Heroicons / Lucide icons via CDN -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-
-    <!-- Signature Pad Library -->
-    <script src="https://cdn.jsdelivr.net/npm/signature_pad@5.0.2/dist/signature_pad.umd.min.js"></script>
-
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/navbar.css">
-    <link rel="stylesheet" href="css/panel.css">
-    <link rel="stylesheet" href="css/workspace.css">
 </head>
 
 <body>
-
     <div class="container">
         <!-- Floating Top Bar -->
         <div class="top-bar">
-            <!-- MODOS (RENDERED BY COMPONENTS.JS) -->
             <div class="stroke-presets" id="modeToggle"></div>
-
             <div class="tool-separator"></div>
-
-            <!-- UNDO/CLEAR (RENDERED BY DATA.JS) -->
             <div class="tool-group" id="historyTools"></div>
-
             <div class="tool-separator"></div>
-
-            <!-- EXPORT ACTIONS -->
             <div class="tool-group">
                 <div class="dropdown" id="exportDropdown">
                     <button class="btn-primary btn-tool-large" id="exportMainBtn">
-                        <i data-lucide="download" size="18"></i>
+                        <i data-lucide="download"></i>
                         <span data-i18n="export">EXPORTAR</span>
-                        <i data-lucide="chevron-down" size="14" class="icon-chevron"></i>
+                        <i data-lucide="chevron-down" class="icon-chevron"></i>
                     </button>
                     <div class="dropdown-menu"></div>
                 </div>
@@ -59,39 +40,29 @@
             <div class="side-panel-header">
                 <div class="panel-header-controls">
                     <button class="panel-toggle-btn" id="dockBtn" title="Acoplar/Flotar">
-                        <i data-lucide="layout-sidebar" size="16"></i>
+                        <i data-lucide="layout-sidebar"></i>
                     </button>
                     <span id="panelTitle" class="panel-title-text" data-i18n="panelTitle">PANEL DE CONTROL</span>
                 </div>
                 <button class="panel-toggle-btn" id="minimizeBtn" title="Minimizar (M)">
-                    <i data-lucide="palette" size="18" id="minimizeIcon"></i>
+                    <i data-lucide="palette" id="minimizeIcon"></i>
                 </button>
             </div>
 
             <div class="side-panel-content" id="sidePanelContent">
-
-
                 <!-- Group TRAZO -->
                 <div class="panel-group">
                     <span class="panel-group-title" data-i18n="stroke">TRAZO</span>
-
                     <div class="panel-sub-group">
-                        <!-- Estilo (Tabs) - RENDERED BY DATA.JS -->
                         <div class="stroke-presets-container" id="strokeTypePresets"></div>
-
-                        <!-- Previsualización -->
                         <div class="stroke-preview-container">
                             <span class="preview-label" data-i18n="preview">PREVISUALIZACIÓN</span>
                             <canvas id="strokePreviewCanvas"></canvas>
                         </div>
-
-                        <!-- Tinta (Color) - RENDERED BY DATA.JS -->
                         <div class="panel-input-group">
                             <span class="panel-input-label" data-i18n="color">COLOR</span>
                             <div class="color-picker" id="colorPicker"></div>
                         </div>
-
-                        <!-- Opacidad -->
                         <div class="panel-input-group">
                             <div class="panel-row-header">
                                 <span class="panel-input-label" data-i18n="opacity">OPACIDAD</span>
@@ -100,17 +71,15 @@
                             <input type="range" id="alphaSlider" min="0.1" max="1.0" step="0.05" value="1.0"
                                 class="alpha-slider">
                         </div>
-
-                        <!-- Grosor -->
                         <div class="panel-input-group">
                             <span class="panel-input-label" data-i18n="thickness">GROSOR</span>
                             <div class="thickness-control">
-                                <button class="scrub-btn" id="decWidth"><i data-lucide="minus" size="10"></i></button>
+                                <button class="scrub-btn" id="decWidth"><i data-lucide="minus"></i></button>
                                 <div class="scrub-area" id="thicknessScrubArea">
                                     <input type="number" class="thickness-input" id="thicknessVal" value="2.5"
                                         step="0.1" min="1" max="20">
                                 </div>
-                                <button class="scrub-btn" id="incWidth"><i data-lucide="plus" size="10"></i></button>
+                                <button class="scrub-btn" id="incWidth"><i data-lucide="plus"></i></button>
                             </div>
                             <input type="range" id="thicknessSlider" min="1" max="20" step="0.1" value="2.5"
                                 class="thickness-slider">
@@ -123,53 +92,43 @@
                     <div class="panel-row-header">
                         <span class="panel-group-title" data-i18n="canvas">LIENZO</span>
                     </div>
-
-                    <!-- Size Presets - RENDERED BY DATA.JS -->
                     <div class="stroke-presets-container" id="canvasSizePresets"></div>
-
                     <div class="panel-sub-group">
-                        <!-- Ancho -->
                         <div class="panel-input-group">
                             <span class="panel-input-label" data-i18n="width">ANCHO</span>
                             <div class="thickness-control">
-                                <button class="scrub-btn" id="decCanvasWidth"><i data-lucide="minus"
-                                        size="10"></i></button>
+                                <button class="scrub-btn" id="decCanvasWidth"><i data-lucide="minus"></i></button>
                                 <div class="scrub-area" id="widthScrubArea">
                                     <input type="number" class="thickness-input" id="canvasWidthVal" value="836">
                                 </div>
-                                <button class="scrub-btn" id="incCanvasWidth"><i data-lucide="plus"
-                                        size="10"></i></button>
+                                <button class="scrub-btn" id="incCanvasWidth"><i data-lucide="plus"></i></button>
                             </div>
                             <input type="range" id="widthSlider" min="200" max="2000" step="10" value="836"
                                 class="canvas-range">
                         </div>
-                        <!-- Alto -->
                         <div class="panel-input-group">
                             <span class="panel-input-label" data-i18n="height">ALTO</span>
                             <div class="thickness-control">
-                                <button class="scrub-btn" id="decCanvasHeight"><i data-lucide="minus"
-                                        size="10"></i></button>
+                                <button class="scrub-btn" id="decCanvasHeight"><i data-lucide="minus"></i></button>
                                 <div class="scrub-area" id="heightScrubArea">
                                     <input type="number" class="thickness-input" id="canvasHeightVal" value="400">
                                 </div>
-                                <button class="scrub-btn" id="incCanvasHeight"><i data-lucide="plus"
-                                        size="10"></i></button>
+                                <button class="scrub-btn" id="incCanvasHeight"><i data-lucide="plus"></i></button>
                             </div>
                             <input type="range" id="heightSlider" min="100" max="1000" step="10" value="400"
                                 class="canvas-range">
                         </div>
 
-                        <!-- Zoom -->
                         <div class="panel-input-group">
                             <span class="panel-input-label" data-i18n="zoom">ZOOM</span>
                             <div class="thickness-control">
-                                <button class="scrub-btn" id="decZoom"><i data-lucide="minus" size="10"></i></button>
+                                <button class="scrub-btn" id="decZoom"><i data-lucide="minus"></i></button>
                                 <div class="scrub-area" id="zoomScrubArea">
                                     <input type="number" class="thickness-input" id="zoomVal" value="100" step="1"
                                         min="10" max="500">
                                     <span class="zoom-unit">%</span>
                                 </div>
-                                <button class="scrub-btn" id="incZoom"><i data-lucide="plus" size="10"></i></button>
+                                <button class="scrub-btn" id="incZoom"><i data-lucide="plus"></i></button>
                             </div>
                             <input type="range" id="zoomSlider" min="10" max="500" step="1" value="100"
                                 class="canvas-range">
@@ -177,14 +136,13 @@
                     </div>
                 </div>
 
-                <!-- Group CONFIGURACIÓN - RENDERED BY DATA.JS -->
+                <!-- Group CONFIGURACIÓN -->
                 <div class="panel-config-group"></div>
             </div>
         </div>
 
         <div class="workspace" id="workspace">
             <div class="workspace-controls-bottom"></div>
-
             <div class="canvas-container" id="canvasContainer">
                 <div class="selected-stroke-info" id="selectionInfo">Trazos Seleccionados: 0</div>
                 <div id="selectionBox" class="selection-box"></div>
@@ -192,10 +150,11 @@
                     <div class="resize-handle handle-r" id="resizeHandleR" data-type="width"></div>
                     <div class="resize-handle handle-b" id="resizeHandleB" data-type="height"></div>
                     <div class="resize-handle handle-br" id="resizeHandleBR" data-type="both"></div>
-                    <div class="resize-handle handle-rotate" id="rotateHandle" data-type="rotate" title="Rotar"></div>
+                    <div class="resize-handle handle-rotate" id="rotateHandle" data-type="rotate" title="Rotar">
+                    </div>
                 </div>
                 <div class="canvas-hint" id="canvasHint">
-                    <i data-lucide="pen-tool" size="32" class="hint-icon"></i>
+                    <i data-lucide="pen-tool" class="hint-icon"></i>
                     <span data-i18n="canvasHint">Dibuja tu firma aquí</span><br>
                     <span class="hint-subtext" data-i18n="canvasHintSub">(Compatible con tabletas digitales)</span>
                 </div>
@@ -205,15 +164,8 @@
         </div>
 
         <div class="toast" id="toast" data-i18n="toastSuccess">Firma copiada al portapapeles</div>
-
-        <!-- Module Scripts -->
-        <script src="js/data.js"></script>
-        <script src="js/init.js"></script>
-        <script src="js/workspace.js"></script>
-        <script src="js/canvas.js"></script>
-        <script src="js/panel.js"></script>
-        <script src="js/main.js"></script>
     </div>
+    <script type="module" src="/src/main.ts"></script>
 </body>
 
 </html>
