@@ -89,11 +89,11 @@ export function updateThickness(newVal: string | number) {
 function getThicknessRange(type: string, baseThickness: number) {
     switch (type) {
         case 'marker': return { min: baseThickness, max: baseThickness };
-        case 'pen': return { min: baseThickness * 0.15, max: baseThickness * 3.0 };
+        case 'pen': return { min: baseThickness * 0.3, max: baseThickness * 2.5 };
         case 'brush': return { min: baseThickness * 0.1, max: baseThickness * 4.0 };
         case 'fine': return { min: baseThickness * 0.9, max: baseThickness * 1.1 };
         case 'natural':
-        default: return { min: baseThickness * 0.45, max: baseThickness * 2.0 };
+        default: return { min: baseThickness * 0.6, max: baseThickness * 1.8 };
     }
 }
 
@@ -171,8 +171,8 @@ export function applyColor(colorHex: string) {
 export function drawSelectionHighlights() {
     if (!sctx || !selectionCanvas) return;
     sctx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
-    // Use window.currentMode for delegation or import currentMode if it was reactive
-    if (selectedStrokeIndices.length === 0 || (window as any).currentMode !== 'select') return;
+    const mode = (window as any).currentMode || 'draw';
+    if (selectedStrokeIndices.length === 0 || (mode !== 'select' && mode !== 'transform')) return;
 
     const data = signaturePad.toData();
     sctx.lineCap = 'round'; sctx.lineJoin = 'round';
@@ -213,10 +213,11 @@ export function updateStrokePreview() {
     const endX = w * 0.85;
 
     const range = getThicknessRange(currentStrokeType, currentThickness);
-    const minW = range.min * 1.5;
-    const maxW = range.max * 1.5;
+    const minW = range.min;
+    const maxW = range.max;
 
     const points = 40;
+    pctx.beginPath();
     for (let i = 0; i <= points; i++) {
         const t = i / points;
         const x = startX + (endX - startX) * t;
@@ -227,13 +228,15 @@ export function updateStrokePreview() {
         const pressure = 0.3 + Math.sin(t * Math.PI) * 0.7;
         const currentW = minW + (maxW - minW) * pressure;
 
-        if (i === 0) pctx.moveTo(x, y);
-        else {
-            pctx.beginPath();
+        if (i === 0) {
+            pctx.moveTo(x, y);
+        } else {
             const prevT = (i - 1) / points;
             const prevX = startX + (endX - startX) * prevT;
             const prevSwing = Math.sin(prevT * Math.PI * 2) * (h * 0.2);
             const prevY = centerY + prevSwing;
+
+            pctx.beginPath();
             pctx.moveTo(prevX, prevY);
             pctx.lineTo(x, y);
             pctx.lineWidth = currentW;
