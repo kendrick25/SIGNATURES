@@ -13,12 +13,21 @@ const init = () => {
 
         // Reveal the application with a small delay for smoothness
         setTimeout(() => {
-            document.body.classList.add('ready');
             const splash = document.getElementById('splash-screen');
             if (splash) {
                 splash.style.opacity = '0';
                 splash.style.visibility = 'hidden';
+
+                // Stop any running animations to save resources
+                const progress = splash.querySelector('.splash-progress');
+                const logo = splash.querySelector('.splash-logo');
+                if (progress) (progress as HTMLElement).style.animation = 'none';
+                if (logo) (logo as HTMLElement).style.animation = 'none';
+
+                // Completely remove from DOM after transition
+                setTimeout(() => splash.remove(), 600);
             }
+            document.body.classList.add('ready');
         }, 100);
     } catch (err) {
         console.error("Initialization failed:", err);
