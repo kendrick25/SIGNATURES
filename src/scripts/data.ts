@@ -58,7 +58,8 @@ export const i18n: I18nContent = {
         scale: "Escalar",
         float: "Flotar",
         dock: "Fijar",
-        workspaceTitle: "ESPACIO DE TRABAJO"
+        workspaceTitle: "ESPACIO DE TRABAJO",
+        settings: "CONFIGURACIÓN"
     },
     en: {
         drawMode: "Drawing Mode (P)",
@@ -113,7 +114,8 @@ export const i18n: I18nContent = {
         scale: "Scale",
         float: "Float",
         dock: "Dock",
-        workspaceTitle: "WORKSPACE"
+        workspaceTitle: "WORKSPACE",
+        settings: "SETTINGS"
     }
 };
 

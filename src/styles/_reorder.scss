@@ -39,16 +39,3 @@
 }
 
 // Styles for panels in docked sidebars to ensure proper spacing
-.workspace-sidebar-right,
-.workspace-sidebar-top,
-.workspace-sidebar-bottom {
-    .panel-group {
-        flex-shrink: 0;
-
-        &:not(.floating) {
-            border-radius: 8px;
-            background: rgba(30, 41, 59, 0.5);
-            border: 1px solid var(--glass-border);
-        }
-    }
-}

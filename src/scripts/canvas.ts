@@ -105,12 +105,12 @@ export function updateStrokeStyles() {
     signaturePad.maxWidth = widths.max;
 
     switch (State.currentStrokeType) {
-        case 'marker': signaturePad.velocityFilterWeight = 1; break;
-        case 'pen': signaturePad.velocityFilterWeight = 0.45; break;
-        case 'brush': signaturePad.velocityFilterWeight = 0.5; break;
-        case 'fine': signaturePad.velocityFilterWeight = 0.8; break;
+        case 'marker': signaturePad.velocityFilterWeight = 0; break;
+        case 'pen': signaturePad.velocityFilterWeight = 0; break;
+        case 'brush': signaturePad.velocityFilterWeight = 0; break;
+        case 'fine': signaturePad.velocityFilterWeight = 0; break;
         case 'natural':
-        default: signaturePad.velocityFilterWeight = 0.65; break;
+        default: signaturePad.velocityFilterWeight = 0; break;
     }
     updateStrokePreview();
 }

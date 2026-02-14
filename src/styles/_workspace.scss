@@ -216,11 +216,12 @@
     overflow: hidden;
     position: relative;
     // Excalidraw-style grid
+    // Excalidraw-style dot grid
     background-color: #121826;
-    background-image:
-        radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-    background-size: 30px 30px;
-    background-attachment: local; // Grid moves with content if needed
+    background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: center;
+    background-attachment: local;
     user-select: none;
 }
 
@@ -245,30 +246,33 @@
 .canvas-view-port {
     flex: 1;
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     overflow: hidden;
+    display: block;
 }
 
 .canvas-container {
     background: #0d1117;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 4px;
+    border: none; // REMOVED: BORDERS CAUSE DRIFT IN GETBOUNDINGCLIENTRECT
+    border-radius: 0;
     box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
     cursor: crosshair;
     box-sizing: border-box;
-    display: block; // Prevent inline vertical alignment gaps
+    display: block;
     overflow: hidden;
+    transform-origin: 0 0;
+    will-change: transform;
+    outline: 1px solid rgba(255, 255, 255, 0.08); // Use outline instead of border for visual only
 
     &::after {
         content: '';
         position: absolute;
-        top: -10px;
-        left: -10px;
-        right: -10px;
-        bottom: -10px;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
         border: 1px solid rgba(255, 255, 255, 0.03);
         pointer-events: none;
     }
@@ -312,248 +316,34 @@
 
 // Sidebar Correct Styling logic
 
-.workspace-sidebar-right {
-    position: absolute;
-    top: 0;
-    right: 0;
-    height: 100%;
-    width: var(--sidebar-right-width, 0px);
-    background: rgba(15, 23, 42, 0.98);
-    backdrop-filter: blur(20px);
-    border-left: 1px solid var(--glass-border);
-    z-index: 950;
-    display: flex;
-    flex-direction: row; // [Handle (left) | Content]
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden; // Prevent overflow affecting workspace
-    isolation: isolate; // Create new stacking context
-
-    .sidebar-resizer {
-        width: 4px;
-        height: 100%;
-        cursor: col-resize;
-        flex-shrink: 0;
-        background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px);
-        background-size: 4px 4px;
-
-        &:hover {
-            background-color: var(--primary);
-        }
-    }
-
-    .sidebar-inner-container {
-        flex: 1;
-        height: 100%;
-        overflow: hidden; // Container doesn't scroll
-        padding: 0.5rem;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .sidebar-scroll-container {
-        flex: 1;
-        height: 100%;
-        overflow-y: auto; // Only this scrolls
-        overflow-x: hidden;
-        direction: ltr; // Scroll on right for right sidebar
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem; // Space between panels
-        scrollbar-gutter: stable; // Reserve space for scrollbar
-        overscroll-behavior: contain; // Prevent scroll chaining to workspace
-
-        &::-webkit-scrollbar {
-            width: 6px; // Slightly wider for better visibility
-        }
-
-        &::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-        }
-
-        &::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 10px;
-
-            &:hover {
-                background: rgba(255, 255, 255, 0.25);
-            }
-        }
-    }
-}
-
-.workspace-sidebar-top {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: var(--sidebar-top-height, 0px);
-    min-height: 0;
-    background: rgba(15, 23, 42, 0.98);
-    backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--glass-border);
-    z-index: 940;
-    display: flex;
-    height: var(--sidebar-top-height, 0px);
-    overflow: visible;
-    isolation: isolate;
-    display: none; // Hidden by default
-
-    &.has-content {
-        display: flex;
-    }
-
-    .sidebar-resizer {
-        height: 4px;
-        width: 100%;
-        cursor: row-resize;
-        flex-shrink: 0;
-        background-color: transparent;
-
-        &:hover {
-            background-color: var(--primary);
-        }
-    }
-
-    .sidebar-inner-container {
-        flex: 1;
-        width: 100%;
-        min-height: 0;
-        overflow: visible; // Permitir que el contenido sea visible
-        padding: 0.5rem;
-        display: flex;
-    }
-
-    .sidebar-scroll-container {
-        flex: 1;
-        width: 100%;
-        min-height: 0;
-        overflow-x: auto;
-        overflow-y: visible; // Permitir overflow vertical
-        display: flex;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        gap: 0.5rem;
-        padding: 0;
-        scrollbar-gutter: stable;
-        overscroll-behavior: contain;
-
-        &::-webkit-scrollbar {
-            height: 6px;
-        }
-
-        &::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-        }
-
-        &::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 10px;
-
-            &:hover {
-                background: rgba(255, 255, 255, 0.25);
-            }
-        }
-    }
-}
-
-.workspace-sidebar-bottom {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: var(--sidebar-bottom-height, 0px);
-    min-height: 0;
-    background: rgba(15, 23, 42, 0.98);
-    backdrop-filter: blur(20px);
-    border-top: 1px solid var(--glass-border);
-    z-index: 940;
-    height: var(--sidebar-bottom-height, 0px);
-    overflow: visible;
-    isolation: isolate;
-    display: none;
-
-    &.has-content {
-        display: flex;
-    }
-
-    .sidebar-resizer {
-        height: 4px;
-        width: 100%;
-        cursor: row-resize;
-        flex-shrink: 0;
-        background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px);
-        background-size: 4px 4px;
-
-        &:hover {
-            background-color: var(--primary);
-        }
-    }
-
-    .sidebar-inner-container {
-        flex: 1;
-        width: 100%;
-        min-height: 0;
-        overflow: visible; // Permitir que el contenido sea visible
-        padding: 0.5rem;
-        display: flex;
-    }
-
-    .sidebar-scroll-container {
-        flex: 1;
-        width: 100%;
-        min-height: 0;
-        overflow-x: auto;
-        overflow-y: visible; // Permitir overflow vertical
-        display: flex;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        gap: 0.5rem;
-        padding: 0;
-        scrollbar-gutter: stable;
-        overscroll-behavior: contain;
-
-        &::-webkit-scrollbar {
-            height: 6px;
-        }
-
-        &::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-        }
-
-        &::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 10px;
-
-            &:hover {
-                background: rgba(255, 255, 255, 0.25);
-            }
-        }
-    }
-}
 
 
 
-canvas#signatureCanvas {
-    touch-action: none;
-    display: block;
-    background: transparent;
-    z-index: 1;
-}
 
+
+
+
+
+canvas#signatureCanvas,
 .selection-canvas-layer {
     position: absolute;
     top: 0;
     left: 0;
     width: 100% !important;
     height: 100% !important;
+    display: block;
+}
+
+canvas#signatureCanvas {
+    touch-action: none;
+    background: transparent;
+    z-index: 1;
+}
+
+.selection-canvas-layer {
     pointer-events: none;
     background: transparent;
     z-index: 5; // Above signature but below UI/handles
-    display: block; // Always block, logic clears it
 }
 
 .selected-bounds {
@@ -656,7 +446,7 @@ canvas#signatureCanvas {
     position: fixed;
     top: 64px;
     right: 1.5rem;
-    width: 220px;
+    width: 260px;
     background: rgba(15, 23, 42, 0.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -669,7 +459,6 @@ canvas#signatureCanvas {
     pointer-events: none;
     transition: all 0.2s ease-out;
     padding: 0.85rem;
-    backdrop-filter: blur(20px);
 
     &.active {
         opacity: 1;
@@ -678,7 +467,7 @@ canvas#signatureCanvas {
     }
 
     .settings-header {
-        font-size: 0.6rem;
+        font-size: 0.7rem;
         font-weight: 800;
         color: var(--text-dim);
         letter-spacing: 0.1em;
@@ -686,14 +475,12 @@ canvas#signatureCanvas {
         padding-bottom: 0.4rem;
         border-bottom: 1px solid var(--glass-border);
         text-transform: uppercase;
-        opacity: 0.5;
+        width: 100%;
     }
 
-    .settings-label {
-        font-size: 0.62rem;
-        font-weight: 600;
-        color: var(--text-main);
-        text-transform: uppercase;
-        letter-spacing: 0.02em;
+    /* Reuse existing config group styles but scoped */
+    .panel-config-group {
+        margin: 0;
+        gap: 0.5rem;
     }
 }

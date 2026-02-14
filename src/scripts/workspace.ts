@@ -1,22 +1,40 @@
-import { container, workspacePan, workspaceScale, signaturePad, ratio, canvas, sctx, ctx, selectionCanvas, hint, selectedStrokeIndices } from '@/scripts/state';
+import { container, workspace, workspacePan, workspaceScale, signaturePad, canvas, sctx, ctx, selectionCanvas, hint, selectedStrokeIndices } from '@/scripts/state';
 import { drawSelectionHighlights } from '@/scripts/canvas';
 
 
 
 export function updateWorkspaceTransform() {
     if (!container) return;
-    container.style.transform = `translate(${workspacePan.x}px, ${workspacePan.y}px) scale(${workspaceScale})`;
+
+    // Round pan values to avoid sub-pixel rendering artifacts
+    const px = Math.round(workspacePan.x);
+    const py = Math.round(workspacePan.y);
+    const s = parseFloat(workspaceScale.toFixed(4));
+
+    container.style.transform = `translate(${px}px, ${py}px) scale(${s})`;
+
+    // EXCALIDRAW STYLE: Sync the viewport background grid to the workspace pan/zoom
+    const mainLayout = document.querySelector('.app-main-layout') as HTMLElement;
+    if (mainLayout) {
+        const baseGridSize = 20;
+        const scaledGridSize = baseGridSize * s;
+        mainLayout.style.backgroundSize = `${scaledGridSize}px ${scaledGridSize}px`;
+
+        // Align grid with the canvas physical origin
+        const rect = container.getBoundingClientRect();
+        mainLayout.style.backgroundPosition = `${Math.round(rect.left)}px ${Math.round(rect.top)}px`;
+    }
 
     // Update global reference
-    (window as any).workspaceScale = workspaceScale;
+    (window as any).workspaceScale = s;
     updateSignaturePadOptions();
 }
 
 export function updateSignaturePadOptions() {
     if (!signaturePad) return;
-    // Dynamic adjustment: More points when zoomed in, more filtering when zoomed out
-    signaturePad.minDistance = 0.5 / Math.max(0.1, workspaceScale);
-    signaturePad.throttle = Math.max(0, Math.floor(8 / Math.max(0.1, workspaceScale)));
+    // Balanced adjustment: enough points for curves, not too many to cause jitter
+    signaturePad.minDistance = 0; // Stroke starts immediately at mouse down
+    signaturePad.throttle = 0; // Absolute 1:1 instantaneous response
 }
 
 export function syncSizeValues() {
@@ -37,8 +55,9 @@ export function resizeCanvas() {
     // Store data to restore after resize
     const data = signaturePad.toData();
 
-    // Use a stable ratio for internal resolution to prevent coordinate drift on zoom
-    const effectiveScale = ratio;
+    // Use current devicePixelRatio to handle browser zoom levels dynamically
+    const currentRatio = Math.max(window.devicePixelRatio || 1, 1);
+    const effectiveScale = currentRatio;
 
     // Use clientWidth to avoid border-induced growth loops
     const baseWidth = Math.floor(container.clientWidth);
@@ -155,9 +174,17 @@ export function autoAdjustCanvas() {
 }
 
 export function recenterCanvas() {
-    workspacePan.x = 0;
-    workspacePan.y = 0;
-    // We don't necessarily want to reset scale on recenter according to original js
-    // But we'll keep it consistent with the user's previous experience
+    if (!container || !workspace) return;
+
+    // Get viewport dimensions
+    const viewportRect = workspace.getBoundingClientRect();
+    const containerWidth = container.offsetWidth;
+    const containerHeight = container.offsetHeight;
+
+    // Calculate top-left position to center at scale 1
+    // We treat this centered position as the "natural" origin for workspacePan
+    workspacePan.x = (viewportRect.width - containerWidth) / 2;
+    workspacePan.y = (viewportRect.height - containerHeight) / 2;
+
     updateWorkspaceTransform();
 }

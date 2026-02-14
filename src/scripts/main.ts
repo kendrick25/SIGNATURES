@@ -42,6 +42,7 @@ export function initAppLogic() {
     attachEventListeners();
     attachDynamicListeners();
     initSidebarResizing();
+    updateWorkspaceLayout();
 
     // Initial state check for body classes
     if (sidePanel) {
@@ -50,17 +51,31 @@ export function initAppLogic() {
     }
 
     if (signaturePad) {
-        (signaturePad as any)._getPointFromEvent = function (event: PointerEvent) {
-            const rect = canvas.getBoundingClientRect();
-            const x = (event.clientX - rect.left) / State.workspaceScale;
-            const y = (event.clientY - rect.top) / State.workspaceScale;
-            return {
-                x: x,
-                y: y,
-                pressure: (event as any).pressure || 0.5,
-                time: event.timeStamp || Date.now()
+        // Fix for SignaturePad 5.x: The library expects _createPoint(clientX, clientY, pressure).
+        // It internally subtracts getBoundingClientRect().left/top.
+        // We wrap it to apply our workspace zoom factor (s).
+        const originalCreatePoint = (signaturePad as any)._createPoint;
+        if (typeof originalCreatePoint === 'function') {
+            (signaturePad as any)._createPoint = function (x: number, y: number, pressure: number) {
+                const rect = canvas.getBoundingClientRect();
+
+                // Definitive scale factor: realized screen width / logical layout width
+                // This handles workspace zoom (CSS transform: scale).
+                // Browser zoom is transparent as clientX and rect are both in CSS pixels.
+                const s = rect.width / (canvas.clientWidth || 1);
+
+                // We want the resulting internal point to be: (clientX - rect.left) / s
+                // Since the original method does (x_input - rect.left), we must pass it: 
+                // x_input = rect.left + (clientX - rect.left) / s
+                const x_patched = rect.left + (x - rect.left) / (s || 1);
+                const y_patched = rect.top + (y - rect.top) / (s || 1);
+
+                return originalCreatePoint.call(this, x_patched, y_patched, pressure);
             };
-        };
+        }
+
+        // Sync the older internal reference just in case
+        (signaturePad as any)._getPointFromEvent = (signaturePad as any)._createPoint;
     }
     updateTransformPanelState();
 }
@@ -159,26 +174,17 @@ function setupScrubbing(areaId: string, getValue: () => number, setValue: (v: nu
 function getCanvasCoordinates(e: any) {
     if (!canvas || !workspace) return { x: 0, y: 0 };
 
+    const rect = canvas.getBoundingClientRect();
+    const sx = rect.width / (canvas.clientWidth || 1);
+    const sy = rect.height / (canvas.clientHeight || 1);
+    const s = (sx + sy) / 2;
+
     const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
     const clientY = e.clientY ?? (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
 
-    // We calibrate everything against the 'canvas-view-port' which is the stable reference
-    const viewport = workspace.querySelector('.canvas-view-port');
-    if (!viewport) return { x: 0, y: 0 };
-
-    // const vRect = viewport.getBoundingClientRect(); // Unused
-
-    // 1. Get position relative to viewport center (where container is anchored)
-    // The container is centered using flex: align-items center, justify-content center.
-    // So its logical (0,0) before pan/scale is at the center of the viewport minus half container size.
-
-    // Actually, a simpler and more robust way:
-    // Use the canvas's OWN bounding rect but account for the workspaceScale precisely.
-    const cRect = canvas.getBoundingClientRect();
-
     return {
-        x: (clientX - cRect.left) / State.workspaceScale,
-        y: (clientY - cRect.top) / State.workspaceScale
+        x: (clientX - rect.left) / (s || 1),
+        y: (clientY - rect.top) / (s || 1)
     };
 }
 
@@ -226,12 +232,7 @@ function attachEventListeners() {
         if (!signaturePad.isEmpty() || history.length > 0) { e.preventDefault(); e.returnValue = ''; }
     });
 
-    const settingsToggle = document.getElementById('settingsToggle');
-    const settingsMenu = document.getElementById('settingsMenu');
-    settingsToggle?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        settingsMenu?.classList.toggle('active');
-    });
+
 
 
 
@@ -239,12 +240,7 @@ function attachEventListeners() {
         autoAdjustCanvas();
     });
 
-    document.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement;
-        if (settingsMenu?.classList.contains('active') && !settingsMenu.contains(target) && !settingsToggle?.contains(target)) {
-            settingsMenu.classList.remove('active');
-        }
-    });
+
 }
 
 function attachDynamicListeners() {
@@ -323,6 +319,16 @@ function attachDynamicListeners() {
                 fullscreenBtn.innerHTML = '<i data-lucide="maximize" size="16"></i>';
             }
             createIcons();
+        }
+
+        const settingsToggle = target.closest('#settingsToggle');
+        if (settingsToggle) {
+            const dropdown = document.getElementById('settingsMenu');
+            if (dropdown) dropdown.classList.toggle('active');
+        } else if (!target.closest('#settingsMenu') && !target.closest('.color-picker')) {
+            // Close settings if clicking outside
+            const dropdown = document.getElementById('settingsMenu');
+            if (dropdown) dropdown.classList.remove('active');
         }
     });
 }
@@ -464,17 +470,38 @@ function attachControlListeners() {
 }
 
 function handleWheel(e: WheelEvent) {
-    if (!workspace) return;
+    if (!workspace || !canvas) return;
     e.preventDefault();
+
+    // 1. Get current physical position of drawing surface
+    const canvasRect = canvas.getBoundingClientRect();
+
+    // 2. Identify the logical "Scene" coordinate under the mouse
+    // This is the invariant point we want to keep under the cursor.
+    const sceneX = (e.clientX - canvasRect.left) / State.workspaceScale;
+    const sceneY = (e.clientY - canvasRect.top) / State.workspaceScale;
+
+    // 3. Calculate new scale
     const delta = -e.deltaY, factor = 1 + delta * 0.001;
     const newScale = Math.max(0.1, Math.min(5, State.workspaceScale * factor));
+
     if (newScale !== State.workspaceScale) {
-        const rect = workspace.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
-        const dx = (mouseX - workspacePan.x) / State.workspaceScale, dy = (mouseY - workspacePan.y) / State.workspaceScale;
+        // 4. Stable "Initial" layout position (pan=0)
+        // Since transform-origin is 0,0, the left edge visual position is: InitialLeft + PanX
+        // So InitialLeft = current_left - current_pan
+        const initialLayoutX = canvasRect.left - workspacePan.x;
+        const initialLayoutY = canvasRect.top - workspacePan.y;
+
         setWorkspaceScale(newScale);
-        workspacePan.x = mouseX - dx * newScale; workspacePan.y = mouseY - dy * newScale;
+
+        // 5. Update Pan to keep the scene point at the same screen location
+        // NewScreenPos = initialLayoutX + NewPan + (sceneX * newScale)
+        // We want NewScreenPos to match e.clientX
+        workspacePan.x = e.clientX - initialLayoutX - (sceneX * newScale);
+        workspacePan.y = e.clientY - initialLayoutY - (sceneY * newScale);
+
         updateWorkspaceTransform();
+
         const zInput = document.getElementById('zoomVal') as HTMLInputElement;
         const zSlider = document.getElementById('zoomSlider') as HTMLInputElement;
         if (zInput) zInput.value = Math.round(newScale * 100).toString();
@@ -490,7 +517,7 @@ let modeBeforeMiddleClick: string | null = null;
 function updateCursor(e: PointerEvent) {
     if (State.isPanning) { document.body.style.cursor = 'grabbing'; return; }
     const target = e.target as HTMLElement;
-    if (target.closest('.side-panel, .app-header, .workspace-sidebar-right, .workspace-sidebar-bottom, .workspace-sidebar-top')) {
+    if (target.closest('.side-panel, .app-header')) {
         document.body.style.cursor = 'default'; return;
     }
 
@@ -516,7 +543,7 @@ function updateCursor(e: PointerEvent) {
 
 function handlePointerDown(e: PointerEvent) {
     const target = e.target as HTMLElement;
-    if (target.closest('.side-panel') || target.closest('.app-header') || target.closest('.workspace-sidebar-right') || target.closest('.workspace-sidebar-bottom') || target.closest('.workspace-sidebar-top')) return;
+    if (target.closest('.side-panel') || target.closest('.app-header')) return;
 
     if (e.button === 1) {
         modeBeforeMiddleClick = State.currentMode; setMode('pan'); setPanning(true);
@@ -548,10 +575,33 @@ function handlePointerDown(e: PointerEvent) {
         const clickedInsideSelection = (cx >= bounds.minX && cx <= bounds.maxX && cy >= bounds.minY && cy <= bounds.maxY);
         const data = signaturePad.toData();
         let clickedStrokeIdx = -1;
-        const hitSlop = 10 / State.workspaceScale;
+        const rect = canvas.getBoundingClientRect();
+        const actualScaleX = rect.width / canvas.offsetWidth || 1;
+        const hitSlop = 10 / actualScaleX;
+
         for (let i = data.length - 1; i >= 0; i--) {
-            const stroke = data[i], radius = (stroke.maxWidth + stroke.minWidth) / 2 + hitSlop;
-            if (stroke.points.some((p: any) => Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2) < radius)) { clickedStrokeIdx = i; break; }
+            const stroke = data[i];
+            const radius = ((stroke.maxWidth + stroke.minWidth) / 2) + hitSlop;
+
+            // Optimization: Bounding Box Check first
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const p of stroke.points) {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+            }
+
+            // Expand by radius
+            minX -= radius; maxX += radius; minY -= radius; maxY += radius;
+
+            if (cx < minX || cx > maxX || cy < minY || cy > maxY) continue;
+
+            // Detailed Check
+            if (stroke.points.some((p: any) => Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2) < radius)) {
+                clickedStrokeIdx = i;
+                break;
+            }
         }
 
         if (clickedStrokeIdx !== -1) {
@@ -667,11 +717,7 @@ function handlePointerUp(e: PointerEvent) {
 
 
 function updateWorkspaceLayout() {
-    const rSidebar = document.getElementById('rightSidebar'), rContent = document.getElementById('rightSidebarContent');
-    const bSidebar = document.getElementById('bottomSidebar'), bContent = document.getElementById('bottomSidebarContent');
-    const tSidebar = document.getElementById('topSidebar'), tContent = document.getElementById('topSidebarContent');
     const sidePanelEl = document.getElementById('sidePanel');
-    if (!rSidebar || !rContent || !bSidebar || !bContent || !tSidebar || !tContent) return;
 
     // Sync Main Side Panel Width
     let panelWidth = 0;
@@ -687,107 +733,16 @@ function updateWorkspaceLayout() {
     }
     document.documentElement.style.setProperty('--panel-width', panelWidth + 'px');
 
-    const rDocked = rContent.querySelectorAll('.panel-group.docked-right:not(.minimized-right)');
-    const rTotal = rContent.querySelectorAll('.panel-group.docked-right').length;
-    if (rTotal > 0) {
-        document.body.classList.add('has-docked-right');
-        const width = rDocked.length === 0 ? 40 : parseInt(rSidebar.dataset.storedWidth || '320');
-        document.documentElement.style.setProperty('--sidebar-right-width', width + 'px');
-    } else { document.body.classList.remove('has-docked-right'); document.documentElement.style.setProperty('--sidebar-right-width', '0px'); }
-
-
-    const tDocked = tContent.querySelectorAll('.panel-group.docked-top:not(.minimized-top)');
-    const tTotal = tContent.querySelectorAll('.panel-group.docked-top').length;
-    if (tTotal > 0) {
-        document.body.classList.add('has-docked-top');
-        tSidebar.classList.add('has-content');
-        const height = tDocked.length === 0 ? 40 : Math.max(60, parseInt(tSidebar.dataset.storedHeight || '125'));
-        document.documentElement.style.setProperty('--sidebar-top-height', height + 'px');
-        tSidebar.style.height = height + 'px';
-    } else {
-        document.body.classList.remove('has-docked-top');
-        tSidebar.classList.remove('has-content');
-        tSidebar.style.height = '0px';
-        document.documentElement.style.setProperty('--sidebar-top-height', '0px');
-    }
-
-    const bDocked = bContent.querySelectorAll('.panel-group.docked-bottom:not(.minimized-bottom)');
-    const bTotal = bContent.querySelectorAll('.panel-group.docked-bottom').length;
-    if (bTotal > 0) {
-        document.body.classList.add('has-docked-bottom');
-        bSidebar.classList.add('has-content');
-        const height = bDocked.length === 0 ? 40 : Math.max(60, parseInt(bSidebar.dataset.storedHeight || '125'));
-        document.documentElement.style.setProperty('--sidebar-bottom-height', height + 'px');
-        bSidebar.style.height = height + 'px';
-    } else {
-        document.body.classList.remove('has-docked-bottom');
-        bSidebar.classList.remove('has-content');
-        bSidebar.style.height = '0px';
-        document.documentElement.style.setProperty('--sidebar-bottom-height', '0px');
-    }
-
-    // Correct Width Calculation for workspace-internal sidebars
-    const rightWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-right-width') || '0');
-
-    // Apply adaptive width to bottom and top sidebars
-    // Note: These sidebars are INSIDE the .workspace, so left=0 starts AFTER the docked side panel.
-    bSidebar.style.left = '0px';
-    bSidebar.style.right = rightWidth + 'px';
-    bSidebar.style.width = 'auto'; // Let left/right handle it
-
-    tSidebar.style.left = '0px';
-    tSidebar.style.right = rightWidth + 'px';
-    tSidebar.style.width = 'auto';
+    // Reset other sidebar variables
+    document.documentElement.style.setProperty('--sidebar-right-width', '0px');
+    document.documentElement.style.setProperty('--sidebar-top-height', '0px');
+    document.documentElement.style.setProperty('--sidebar-bottom-height', '0px');
+    document.body.classList.remove('has-docked-right', 'has-docked-top', 'has-docked-bottom');
 
     resizeCanvas();
 }
 
 function initSidebarResizing() {
-    const rResizer = document.getElementById('rightSidebarResizer'), rSidebar = document.getElementById('rightSidebar');
-    if (rResizer && rSidebar) {
-        let isResizing = false, startX = 0, startWidth = 0;
-        rResizer.addEventListener('pointerdown', (e) => {
-            isResizing = true; startX = e.clientX; startWidth = rSidebar.offsetWidth;
-            rResizer.setPointerCapture(e.pointerId); document.body.classList.add('resizing'); e.stopPropagation();
-        });
-        window.addEventListener('pointermove', (e) => {
-            if (!isResizing) return;
-            const newWidth = Math.max(200, Math.min(600, startWidth - (e.clientX - startX)));
-            document.documentElement.style.setProperty('--sidebar-right-width', newWidth + 'px');
-            rSidebar.dataset.storedWidth = newWidth.toString(); updateWorkspaceLayout();
-        });
-        window.addEventListener('pointerup', () => { if (isResizing) { isResizing = false; document.body.classList.remove('resizing'); updateWorkspaceLayout(); } });
-    }
-    const bResizer = document.getElementById('bottomSidebarResizer'), bSidebar = document.getElementById('bottomSidebar');
-    if (bResizer && bSidebar) {
-        let isResizing = false, startY = 0, startHeight = 0;
-        bResizer.addEventListener('pointerdown', (e) => {
-            isResizing = true; startY = e.clientY; startHeight = bSidebar.offsetHeight;
-            bResizer.setPointerCapture(e.pointerId); document.body.classList.add('resizing'); e.stopPropagation();
-        });
-        window.addEventListener('pointermove', (e) => {
-            if (!isResizing) return;
-            const newHeight = Math.max(60, Math.min(500, startHeight - (e.clientY - startY)));
-            document.documentElement.style.setProperty('--sidebar-bottom-height', newHeight + 'px');
-            bSidebar.dataset.storedHeight = newHeight.toString(); updateWorkspaceLayout();
-        });
-        window.addEventListener('pointerup', () => { if (isResizing) { isResizing = false; document.body.classList.remove('resizing'); updateWorkspaceLayout(); } });
-    }
-    const tResizer = document.getElementById('topSidebarResizer'), tSidebar = document.getElementById('topSidebar');
-    if (tResizer && tSidebar) {
-        let isResizing = false, startY = 0, startHeight = 0;
-        tResizer.addEventListener('pointerdown', (e) => {
-            isResizing = true; startY = e.clientY; startHeight = tSidebar.offsetHeight;
-            tResizer.setPointerCapture(e.pointerId); document.body.classList.add('resizing'); e.stopPropagation();
-        });
-        window.addEventListener('pointermove', (e) => {
-            if (!isResizing) return;
-            const newHeight = Math.max(60, Math.min(500, startHeight + (e.clientY - startY)));
-            document.documentElement.style.setProperty('--sidebar-top-height', newHeight + 'px');
-            tSidebar.dataset.storedHeight = newHeight.toString(); updateWorkspaceLayout();
-        });
-        window.addEventListener('pointerup', () => { if (isResizing) { isResizing = false; document.body.classList.remove('resizing'); updateWorkspaceLayout(); } });
-    }
     const sideResizer = document.getElementById('sidePanelResizer'), sidePanelEl = document.getElementById('sidePanel');
     if (sideResizer && sidePanelEl) {
         let isResizing = false, startX = 0, startWidth = 0;
@@ -836,14 +791,42 @@ function handleKeyDown(e: KeyboardEvent) {
 
 function findStrokesInArea(x1: number, y1: number, x2: number, y2: number, shift: boolean, ctrl: boolean) {
     const data = signaturePad.toData(), found: number[] = [];
-    const isClick = (Math.abs(x2 - x1) * State.workspaceScale) < 5 && (Math.abs(y2 - y1) * State.workspaceScale) < 5;
+    const rect = canvas.getBoundingClientRect();
+    const actualScaleX = rect.width / (canvas.offsetWidth || 1);
+    const isClick = (Math.abs(x2 - x1) * actualScaleX) < 5 && (Math.abs(y2 - y1) * actualScaleX) < 5;
     const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
     data.forEach((stroke, idx) => {
-        let match = false; const hitSlop = 5 / State.workspaceScale, radius = (stroke.maxWidth + stroke.minWidth) / 2 + hitSlop;
-        stroke.points.forEach((p: any) => {
-            if (isClick) { if (Math.sqrt((p.x - midX) ** 2 + (p.y - midY) ** 2) < radius + (10 / State.workspaceScale)) match = true; }
-            else { const l = Math.min(x1, x2), r = Math.max(x1, x2), t = Math.min(y1, y2), b = Math.max(y1, y2); if (p.x >= l && p.x <= r && p.y >= t && p.y <= b) match = true; }
-        });
+        let match = false;
+        const hitSlop = 5 / actualScaleX;
+        const radius = ((stroke.maxWidth + stroke.minWidth) / 2) + hitSlop;
+
+        // Fast Bounding Box Check
+        let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
+        for (const p of stroke.points) {
+            if (p.x < sMinX) sMinX = p.x;
+            if (p.x > sMaxX) sMaxX = p.x;
+            if (p.y < sMinY) sMinY = p.y;
+            if (p.y > sMaxY) sMaxY = p.y;
+        }
+        sMinX -= radius; sMaxX += radius; sMinY -= radius; sMaxY += radius;
+
+        if (isClick) {
+            // Click selection
+            if (midX >= sMinX && midX <= sMaxX && midY >= sMinY && midY <= sMaxY) {
+                if (stroke.points.some((p: any) => Math.sqrt((p.x - midX) ** 2 + (p.y - midY) ** 2) < radius + (10 / State.workspaceScale))) match = true;
+            }
+        } else {
+            // Drag Selection (Marquee)
+            const l = Math.min(x1, x2), r = Math.max(x1, x2), t = Math.min(y1, y2), b = Math.max(y1, y2);
+            // Check if bounding boxes overlap at all
+            if (sMaxX < l || sMinX > r || sMaxY < t || sMinY > b) {
+                match = false;
+            } else {
+                // Detailed check: if any point is inside
+                if (stroke.points.some((p: any) => p.x >= l && p.x <= r && p.y >= t && p.y <= b)) match = true;
+            }
+        }
+
         if (match) found.push(idx);
     });
     if (ctrl && isClick) {

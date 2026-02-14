@@ -7,6 +7,95 @@
     <title>Firmas Vectoriales</title>
     <meta name="description" content="Generador de firmas digitales de alta calidad.">
 
+    <!-- Critical CSS for Splash Screen -->
+    <style>
+        body {
+            margin: 0;
+            background-color: #0f172a;
+            overflow: hidden;
+        }
+
+        .main-app-container {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease-in;
+        }
+
+        body.ready .main-app-container {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #0f172a;
+            display: flex;
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease-out, visibility 0.5s;
+        }
+
+        body.ready #splash-screen {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .splash-logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #6366f1, #06b6d4);
+            border-radius: 20px;
+            margin-bottom: 2rem;
+            animation: pulse 2s infinite ease-in-out;
+            box-shadow: 0 0 40px rgba(99, 102, 241, 0.4);
+        }
+
+        .splash-loader {
+            width: 200px;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .splash-progress {
+            width: 40%;
+            height: 100%;
+            background: #6366f1;
+            animation: loading 1.5s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+        }
+
+        @keyframes loading {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(200%);
+            }
+        }
+    </style>
+
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -228,6 +317,8 @@
                                     </div>
                                 </div>
                             </div>
+
+
                         </div>
                     </div>
                 </div>
@@ -262,26 +353,11 @@
                 </div>
 
                 <!-- Docking Areas -->
-                <div class="workspace-sidebar-right" id="rightSidebar">
-                    <div class="sidebar-resizer" id="rightSidebarResizer"></div>
-                    <div class="sidebar-inner-container">
-                        <div class="sidebar-scroll-container" id="rightSidebarContent"></div>
-                    </div>
-                </div>
 
-                <div class="workspace-sidebar-top" id="topSidebar">
-                    <div class="sidebar-inner-container">
-                        <div class="sidebar-scroll-container" id="topSidebarContent"></div>
-                    </div>
-                    <div class="sidebar-resizer" id="topSidebarResizer"></div>
-                </div>
 
-                <div class="workspace-sidebar-bottom" id="bottomSidebar">
-                    <div class="sidebar-resizer" id="bottomSidebarResizer"></div>
-                    <div class="sidebar-inner-container">
-                        <div class="sidebar-scroll-container" id="bottomSidebarContent"></div>
-                    </div>
-                </div>
+
+
+
 
 
             </div>
@@ -293,6 +369,7 @@
         <div class="settings-header">CONFIGURACIÓN</div>
         <div class="panel-config-group" id="config-group"></div>
     </div>
+
 
     <div class="toast" id="toast">Firma copiada al portapapeles</div>
 
