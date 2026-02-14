@@ -1,0 +1,41 @@
+// Styles for panel reordering preview
+.panel-group.reorder-preview {
+
+    // Hide all content, show only title (tab-like)
+    .panel-sub-group,
+    .panel-group-actions {
+        display: none !important;
+    }
+
+    .panel-row-header {
+        margin-bottom: 0 !important;
+        padding: 0.5rem 0.75rem !important;
+        background: rgba(0, 0, 0, 0.3) !important;
+        border-radius: 6px !important;
+    }
+
+    // Compact tab-like appearance
+    min-width: auto !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0.25rem !important;
+    background: rgba(15, 23, 42, 0.3) !important;
+    border: 1px dashed rgba(99, 102, 241, 0.3) !important;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+
+    // Make title compact and visible
+    .panel-group-title {
+        white-space: nowrap;
+        font-size: 0.7rem;
+        opacity: 1;
+        color: var(--text-dim);
+    }
+}
+
+// Smooth transition for panels entering/exiting reorder mode
+.panel-group {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// Styles for panels in docked sidebars to ensure proper spacing

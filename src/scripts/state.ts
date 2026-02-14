@@ -47,6 +47,25 @@ export let workspaceScale = 1.0;
 export let ratio = Math.max(window.devicePixelRatio || 1, 1);
 
 // State Mutators (since we can't change exported 'let' from other modules in ESM directly without functions)
+// Global State Object for true live bindings across modules
+export const State = {
+    get currentThickness() { return currentThickness; },
+    get currentAlpha() { return currentAlpha; },
+    get currentMode() { return currentMode; },
+    get currentStrokeType() { return currentStrokeType; },
+    get lastBaseColor() { return lastBaseColor; },
+    get isSelecting() { return isSelecting; },
+    get isMoving() { return isMoving; },
+    get isResizing() { return isResizing; },
+    get isRotating() { return isRotating; },
+    get isPanning() { return isPanning; },
+    get workspacePan() { return workspacePan; },
+    get workspaceScale() { return workspaceScale; },
+    get selectedStrokeIndices() { return selectedStrokeIndices; },
+    get currentLang() { return currentLang; },
+    get clipboardStrokes() { return clipboardStrokes; }
+};
+
 export const setThickness = (val: number) => { currentThickness = val; };
 export const setAlpha = (val: number) => { currentAlpha = val; };
 export const setMode = (val: string) => { currentMode = val; };
