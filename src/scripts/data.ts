@@ -49,7 +49,16 @@ export const i18n: I18nContent = {
         toastStrokesPasted: "Trazos pegados",
         toastPngDownloaded: "PNG descargado",
         toastSvgDownloaded: "SVG descargado",
-        toastPngCopied: "Firma copiada como PNG"
+        toastPngCopied: "Firma copiada como PNG",
+        transformation: "TRANSFORMACIÓN",
+        rotateL: "Girar Izquierda",
+        rotateR: "Girar Derecha",
+        flipH: "Reflejo Horizontal",
+        flipV: "Reflejo Vertical",
+        scale: "Escalar",
+        float: "Flotar",
+        dock: "Fijar",
+        workspaceTitle: "ESPACIO DE TRABAJO"
     },
     en: {
         drawMode: "Drawing Mode (P)",
@@ -95,7 +104,16 @@ export const i18n: I18nContent = {
         toastStrokesPasted: "Strokes pasted",
         toastPngDownloaded: "PNG downloaded",
         toastSvgDownloaded: "SVG downloaded",
-        toastPngCopied: "Signature copied as PNG"
+        toastPngCopied: "Signature copied as PNG",
+        transformation: "TRANSFORMATION",
+        rotateL: "Rotate Left",
+        rotateR: "Rotate Right",
+        flipH: "Flip Horizontal",
+        flipV: "Flip Vertical",
+        scale: "Scale",
+        float: "Float",
+        dock: "Dock",
+        workspaceTitle: "WORKSPACE"
     }
 };
 
@@ -193,11 +211,12 @@ function renderModes() {
 function renderTools() {
     const container = document.getElementById('historyTools');
     if (!container) return;
+    const lang = currentLang as keyof I18nContent;
 
     container.innerHTML = UI_CONFIG.tools.map(tool => `
-        <button class="btn-secondary btn-tool-square" 
+        <button class="header-tool-btn" 
                 id="${tool.id}" 
-                data-i18n="${tool.i18nKey}" 
+                title="${(i18n[lang] && i18n[lang][tool.i18nKey]) ? i18n[lang][tool.i18nKey] : tool.id}"
                 ${tool.disabled ? 'disabled' : ''}>
             <i data-lucide="${tool.icon}"></i>
         </button>
@@ -304,16 +323,22 @@ function renderSettings() {
 }
 
 function renderWorkspaceShortcuts() {
-    const container = document.querySelector('.workspace-controls-bottom');
-    if (!container) return;
+    const containers = [
+        document.querySelector('.workspace-controls-bottom'),
+        document.getElementById('workspaceShortcutsHeader')
+    ];
     const lang = currentLang as keyof I18nContent;
 
-    container.innerHTML = UI_CONFIG.workspaceShortcuts.map(s => `
+    const html = UI_CONFIG.workspaceShortcuts.map(s => `
         <button class="btn-secondary" id="${s.id}" ${s.titleKey ? `title="${(i18n[lang] && i18n[lang][s.titleKey]) ? i18n[lang][s.titleKey] : s.titleKey}"` : ''} data-i18n="${s.i18nKey}">
             <i data-lucide="${s.icon}"></i>
             ${(i18n[lang] && i18n[lang][s.i18nKey]) ? i18n[lang][s.i18nKey] : s.i18nKey}
         </button>
     `).join('');
+
+    containers.forEach(c => {
+        if (c) c.innerHTML = html;
+    });
 }
 
 export function updateGlobalReferences() {
