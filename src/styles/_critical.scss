@@ -1,0 +1,74 @@
+/* Critical CSS to prevent FOUC and Splash Screen Styles */
+body {
+    opacity: 0;
+    background-color: #0f172a;
+    transition: opacity 0.4s ease-in;
+}
+
+body.ready {
+    opacity: 1;
+}
+
+#splash-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #0f172a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.5s ease-out, visibility 0.5s;
+}
+
+.splash-logo {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #6366f1, #06b6d4);
+    border-radius: 20px;
+    box-shadow: 0 0 40px rgba(99, 102, 241, 0.4);
+    margin-bottom: 2rem;
+    animation: pulse 2s infinite ease-in-out;
+}
+
+.splash-loader {
+    width: 200px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.splash-progress {
+    width: 40%;
+    height: 100%;
+    background: #6366f1;
+    animation: loading 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+@keyframes loading {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(200%);
+    }
+}

@@ -1,0 +1,15 @@
+.drop-indicator {
+    position: absolute;
+    background: rgba(var(--primary-rgb), 0.5);
+    border: 2px solid var(--primary);
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 2000;
+    transition: all 0.1s ease-out;
+    display: none; // Hidden by default
+    box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.3);
+
+    &.active {
+        display: block;
+    }
+}

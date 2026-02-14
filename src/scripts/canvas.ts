@@ -1,10 +1,10 @@
-import { signaturePad, selectedStrokeIndices, history, redoStack, currentThickness, currentStrokeType, lastBaseColor, currentAlpha, setSelectedIndices, setRedoStack, hint, setThickness, setLastColor, sctx, selectionCanvas, setStrokeType, currentLang, ratio, clipboardStrokes, setClipboardStrokes } from '@/scripts/state';
-import { updateSelectedBounds, syncControlsWithSelection } from '@/scripts/ui_updates';
+import { State, signaturePad, history, redoStack, setSelectedIndices, setRedoStack, hint, setThickness, setLastColor, sctx, selectionCanvas, setStrokeType, ratio, setClipboardStrokes } from '@/scripts/state';
+import { updateSelectedBounds, syncControlsWithSelection, updateTransformPanelState } from '@/scripts/ui_updates';
 import { i18n } from '@/scripts/data';
 
 export function saveState() {
     const data = JSON.parse(JSON.stringify(signaturePad.toData()));
-    const selection = [...selectedStrokeIndices];
+    const selection = [...State.selectedStrokeIndices];
     history.push({ data, selection });
     setRedoStack([]);
     if (history.length > 50) history.shift();
@@ -14,7 +14,7 @@ export function saveState() {
 export function undo() {
     if (history.length > 0) {
         const currentData = JSON.parse(JSON.stringify(signaturePad.toData()));
-        const currentSelection = [...selectedStrokeIndices];
+        const currentSelection = [...State.selectedStrokeIndices];
         redoStack.push({ data: currentData, selection: currentSelection });
 
         const lastState = history.pop()!;
@@ -27,6 +27,7 @@ export function undo() {
         updateSelectedBounds();
         drawSelectionHighlights();
         syncControlsWithSelection();
+        updateTransformPanelState();
         updateHistoryButtons();
         updateStrokePreview();
     }
@@ -35,7 +36,7 @@ export function undo() {
 export function redo() {
     if (redoStack.length > 0) {
         const currentData = JSON.parse(JSON.stringify(signaturePad.toData()));
-        const currentSelection = [...selectedStrokeIndices];
+        const currentSelection = [...State.selectedStrokeIndices];
         history.push({ data: currentData, selection: currentSelection });
 
         const nextState = redoStack.pop()!;
@@ -46,6 +47,7 @@ export function redo() {
         updateSelectedBounds();
         drawSelectionHighlights();
         syncControlsWithSelection();
+        updateTransformPanelState();
         updateHistoryButtons();
         updateStrokePreview();
     }
@@ -69,11 +71,11 @@ export function updateThickness(newVal: string | number) {
     if (thicknessSliderEl) thicknessSliderEl.value = finalVal.toString();
 
     const data = signaturePad.toData();
-    if (selectedStrokeIndices.length > 0) {
+    if (State.selectedStrokeIndices.length > 0) {
         saveState();
-        selectedStrokeIndices.forEach(index => {
+        State.selectedStrokeIndices.forEach(index => {
             if (data[index]) {
-                const widths = getThicknessRange(currentStrokeType, finalVal);
+                const widths = getThicknessRange(State.currentStrokeType, finalVal);
                 data[index].minWidth = widths.min;
                 data[index].maxWidth = widths.max;
             }
@@ -98,11 +100,11 @@ function getThicknessRange(type: string, baseThickness: number) {
 }
 
 export function updateStrokeStyles() {
-    const widths = getThicknessRange(currentStrokeType, currentThickness);
+    const widths = getThicknessRange(State.currentStrokeType, State.currentThickness);
     signaturePad.minWidth = widths.min;
     signaturePad.maxWidth = widths.max;
 
-    switch (currentStrokeType) {
+    switch (State.currentStrokeType) {
         case 'marker': signaturePad.velocityFilterWeight = 1; break;
         case 'pen': signaturePad.velocityFilterWeight = 0.45; break;
         case 'brush': signaturePad.velocityFilterWeight = 0.5; break;
@@ -115,12 +117,12 @@ export function updateStrokeStyles() {
 
 export function applyStrokeType(type: string) {
     setStrokeType(type);
-    if (selectedStrokeIndices.length > 0) {
+    if (State.selectedStrokeIndices.length > 0) {
         saveState();
         const data = signaturePad.toData();
-        selectedStrokeIndices.forEach(index => {
+        State.selectedStrokeIndices.forEach(index => {
             if (data[index]) {
-                const widths = getThicknessRange(type, currentThickness);
+                const widths = getThicknessRange(type, State.currentThickness);
                 data[index].minWidth = widths.min;
                 data[index].maxWidth = widths.max;
             }
@@ -151,13 +153,13 @@ export function hexToRgba(hex: string, alpha: number) {
 export function applyColor(colorHex: string) {
     if (!colorHex) return;
     setLastColor(colorHex);
-    const finalColor = hexToRgba(colorHex, currentAlpha);
+    const finalColor = hexToRgba(colorHex, State.currentAlpha);
     signaturePad.penColor = finalColor;
 
-    if (selectedStrokeIndices.length > 0) {
+    if (State.selectedStrokeIndices.length > 0) {
         saveState();
         const data = signaturePad.toData();
-        selectedStrokeIndices.forEach(index => {
+        State.selectedStrokeIndices.forEach(index => {
             if (data[index]) data[index].penColor = finalColor;
         });
         signaturePad.fromData(data);
@@ -168,25 +170,46 @@ export function applyColor(colorHex: string) {
     updateStrokePreview();
 }
 
-export function drawSelectionHighlights() {
+export function drawSelectionHighlights(customData: any = null) {
     if (!sctx || !selectionCanvas) return;
-    sctx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
-    const mode = (window as any).currentMode || 'draw';
-    if (selectedStrokeIndices.length === 0 || (mode !== 'select' && mode !== 'transform')) return;
 
-    const data = signaturePad.toData();
-    sctx.lineCap = 'round'; sctx.lineJoin = 'round';
-    selectedStrokeIndices.forEach(idx => {
+    // Reset transform to clear exactly what's on the physical canvas
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    sctx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+
+    const mode = State.currentMode;
+    if (State.selectedStrokeIndices.length === 0 || (mode !== 'select' && mode !== 'transform')) return;
+
+    // Restore scale for drawing highlights
+    const effectiveScale = ratio;
+    sctx.setTransform(effectiveScale, 0, 0, effectiveScale, 0, 0);
+
+    // Use customData if provided (for real-time transform preview)
+    const data = customData || signaturePad.toData();
+    sctx.lineCap = 'round';
+    sctx.lineJoin = 'round';
+
+    const zoomScale = State.workspaceScale;
+
+    State.selectedStrokeIndices.forEach(idx => {
         const stroke = data[idx];
         if (!stroke || stroke.points.length < 2) return;
+
         sctx.beginPath();
         sctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-        stroke.points.forEach((p: any, i: number) => { if (i > 0) sctx.lineTo(p.x, p.y); });
-        sctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
-        sctx.lineWidth = (stroke.maxWidth + stroke.minWidth) + 10;
+        stroke.points.forEach((p: any, i: number) => {
+            if (i > 0) sctx.lineTo(p.x, p.y);
+        });
+
+        // 1. Outer Glow/Halo (Dynamic based on zoom to stay visible)
+        const haloWidth = ((stroke.maxWidth + stroke.minWidth) + (14 / zoomScale));
+        sctx.strokeStyle = 'rgba(99, 102, 241, 0.18)';
+        sctx.lineWidth = haloWidth;
         sctx.stroke();
-        sctx.strokeStyle = 'rgba(99, 102, 241, 0.8)';
-        sctx.lineWidth = 2;
+
+        // 2. Selection border indicator (professional dash/solid feel)
+        sctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
+        sctx.lineWidth = 1.2 / zoomScale; // Stay thin regardless of zoom
         sctx.stroke();
     });
 }
@@ -204,7 +227,7 @@ export function updateStrokePreview() {
     pctx.scale(ratio, ratio);
 
     pctx.clearRect(0, 0, w, h);
-    pctx.strokeStyle = hexToRgba(lastBaseColor, currentAlpha);
+    pctx.strokeStyle = hexToRgba(State.lastBaseColor, State.currentAlpha);
     pctx.lineCap = 'round';
     pctx.lineJoin = 'round';
 
@@ -212,7 +235,7 @@ export function updateStrokePreview() {
     const startX = w * 0.15;
     const endX = w * 0.85;
 
-    const range = getThicknessRange(currentStrokeType, currentThickness);
+    const range = getThicknessRange(State.currentStrokeType, State.currentThickness);
     const minW = range.min;
     const maxW = range.max;
 
@@ -258,7 +281,7 @@ export function showToast(message: string, color = "#10b981") {
 
 export function downloadPng() {
     if (signaturePad.isEmpty()) {
-        showToast(i18n[currentLang].toastSignFirst, "#ef4444");
+        showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
     const dataURL = signaturePad.toDataURL("image/png");
@@ -266,12 +289,12 @@ export function downloadPng() {
     link.download = `firma-${Date.now()}.png`;
     link.href = dataURL;
     link.click();
-    showToast(i18n[currentLang].toastPngDownloaded);
+    showToast(i18n[State.currentLang as keyof typeof i18n].toastPngDownloaded);
 }
 
 export function downloadSvg() {
     if (signaturePad.isEmpty()) {
-        showToast(i18n[currentLang].toastSignFirst, "#ef4444");
+        showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
     const svgData = signaturePad.toDataURL("image/svg+xml");
@@ -279,12 +302,12 @@ export function downloadSvg() {
     link.download = `firma-${Date.now()}.svg`;
     link.href = svgData;
     link.click();
-    showToast(i18n[currentLang].toastSvgDownloaded);
+    showToast(i18n[State.currentLang as keyof typeof i18n].toastSvgDownloaded);
 }
 
 export async function copyPngToClipboard() {
     if (signaturePad.isEmpty()) {
-        showToast(i18n[currentLang].toastSignFirst, "#ef4444");
+        showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
     try {
@@ -294,26 +317,26 @@ export async function copyPngToClipboard() {
         await navigator.clipboard.write([
             new ClipboardItem({ "image/png": blob })
         ]);
-        showToast(i18n[currentLang].toastPngCopied);
+        showToast(i18n[State.currentLang as keyof typeof i18n].toastPngCopied);
     } catch (err) {
         console.error(err);
-        showToast(i18n[currentLang].toastError, "#ef4444");
+        showToast(i18n[State.currentLang as keyof typeof i18n].toastError, "#ef4444");
     }
 }
 export function copySelection() {
-    if (selectedStrokeIndices.length === 0) return;
+    if (State.selectedStrokeIndices.length === 0) return;
     const data = signaturePad.toData();
-    const strokes = selectedStrokeIndices.map(idx => JSON.parse(JSON.stringify(data[idx])));
+    const strokes = State.selectedStrokeIndices.map(idx => JSON.parse(JSON.stringify(data[idx])));
     setClipboardStrokes(strokes);
-    showToast(i18n[currentLang as keyof typeof i18n].toastStrokesCopied, "#6366f1");
+    showToast(i18n[State.currentLang as keyof typeof i18n].toastStrokesCopied, "#6366f1");
 }
 
 export function pasteSelection() {
-    if (clipboardStrokes.length === 0) return;
+    if (State.clipboardStrokes.length === 0) return;
     saveState();
     const data = signaturePad.toData();
     const offset = 20;
-    const newStrokes = clipboardStrokes.map((s: any) => {
+    const newStrokes = State.clipboardStrokes.map((s: any) => {
         const clone = JSON.parse(JSON.stringify(s));
         clone.points.forEach((p: any) => { p.x += offset; p.y += offset; });
         return clone;
@@ -324,26 +347,132 @@ export function pasteSelection() {
     signaturePad.fromData(nextData);
 
     // Select the new strokes
-    const newIndices = newStrokes.map((_, i) => data.length + i);
+    const newIndices = newStrokes.map((_: any, i: number) => data.length + i);
     setSelectedIndices(newIndices);
 
     updateSelectedBounds();
     drawSelectionHighlights();
     syncControlsWithSelection();
+    updateTransformPanelState();
 
-    showToast(i18n[currentLang as keyof typeof i18n].toastStrokesPasted, "#6366f1");
+    showToast(i18n[State.currentLang as keyof typeof i18n].toastStrokesPasted, "#6366f1");
 }
 
 export function deleteSelection() {
-    if (selectedStrokeIndices.length === 0) return;
+    if (State.selectedStrokeIndices.length === 0) return;
     saveState();
     const data = signaturePad.toData();
-    const next = data.filter((_, i) => !selectedStrokeIndices.includes(i));
+    const next = data.filter((_, i) => !State.selectedStrokeIndices.includes(i));
     signaturePad.fromData(next);
 
     setSelectedIndices([]);
     updateSelectedBounds();
     drawSelectionHighlights();
+    updateTransformPanelState();
 
     if (next.length === 0 && hint) hint.classList.remove('hidden');
+}
+
+export function rotateSelection90(dir: 'cw' | 'ccw') {
+    if (State.selectedStrokeIndices.length === 0) return;
+    saveState();
+    const data = signaturePad.toData();
+
+    // Calculate pivot
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    State.selectedStrokeIndices.forEach(idx => {
+        data[idx].points.forEach((p: any) => {
+            minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+            maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+        });
+    });
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+
+    const angle = dir === 'cw' ? Math.PI / 2 : -Math.PI / 2;
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+
+    State.selectedStrokeIndices.forEach(idx => {
+        data[idx].points.forEach((p: any) => {
+            const rx = p.x - cx, ry = p.y - cy;
+            p.x = cx + rx * cos - ry * sin;
+            p.y = cy + rx * sin + ry * cos;
+        });
+    });
+
+    signaturePad.fromData(data);
+    updateSelectedBounds();
+    drawSelectionHighlights();
+}
+
+export function flipSelection(axis: 'h' | 'v') {
+    if (State.selectedStrokeIndices.length === 0) return;
+    saveState();
+    const data = signaturePad.toData();
+
+    // Calculate bounds
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    State.selectedStrokeIndices.forEach(idx => {
+        data[idx].points.forEach((p: any) => {
+            minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+            maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+        });
+    });
+
+    const midX = (minX + maxX) / 2;
+    const midY = (minY + maxY) / 2;
+
+    State.selectedStrokeIndices.forEach(idx => {
+        data[idx].points.forEach((p: any) => {
+            if (axis === 'h') p.x = midX - (p.x - midX);
+            else p.y = midY - (p.y - midY);
+        });
+    });
+
+    signaturePad.fromData(data);
+    updateSelectedBounds();
+    drawSelectionHighlights();
+}
+
+export function scaleSelection(factor: number, save = true, baseData: any = null) {
+    if (State.selectedStrokeIndices.length === 0) return;
+    if (save && !baseData) saveState();
+
+    // If baseData is provided, we use IT as the source truth (for previewing), otherwise we use current data
+    const sourceData = baseData ? JSON.parse(JSON.stringify(baseData)) : signaturePad.toData();
+    const data = signaturePad.toData(); // Current data we will modify
+
+    // Calculate bounds from SOURCE DATA
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    State.selectedStrokeIndices.forEach(idx => {
+        if (sourceData[idx]) {
+            sourceData[idx].points.forEach((p: any) => {
+                minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+            });
+        }
+    });
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+
+    State.selectedStrokeIndices.forEach(idx => {
+        if (sourceData[idx] && data[idx]) {
+            const srcPoints = sourceData[idx].points;
+
+            const newPoints = srcPoints.map((p: any) => ({
+                x: cx + (p.x - cx) * factor,
+                y: cy + (p.y - cy) * factor,
+                pressure: p.pressure,
+                color: p.color
+            }));
+
+            data[idx].points = newPoints;
+            data[idx].minWidth = sourceData[idx].minWidth * factor;
+            data[idx].maxWidth = sourceData[idx].maxWidth * factor;
+        }
+    });
+
+    signaturePad.fromData(data);
+    updateSelectedBounds();
+    drawSelectionHighlights();
 }
