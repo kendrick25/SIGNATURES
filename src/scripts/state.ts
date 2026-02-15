@@ -40,6 +40,16 @@ export let customColors: Record<string, string> = {
     canvasBgPicker: '',
     canvasBorderColorPicker: ''
 };
+export let exportQuality = 0.92;
+export let exportDpi = 96;
+export let exportFormat = 'PNG';
+export let exportAction = 'download';
+export let exportClipOutOfBounds = true;
+export let viewClipOutOfBounds = true;
+export let exportTarget: { format: string, action: 'download' | 'copy' | 'base64', isBase64?: boolean } | null = null;
+export let exportScale = 1;
+export let exportMargin = 0;
+export let exportPreset = 'DEFAULT';
 
 const savedFavorites = localStorage.getItem('favoriteColors');
 export let favoriteColors: string[] = savedFavorites ? JSON.parse(savedFavorites) : ['#ffffff', '#6366f1', '#06b6d4', '#000000'];
@@ -55,6 +65,7 @@ export let workspaceScale = 1.0;
 // Super-Sampling Ratio: 2x or 3x is usually the sweet spot for browsers. 
 // 4x or higher can sometimes trigger "fast/low-quality" scaling paths in GPUs.
 export let ratio = Math.max(window.devicePixelRatio || 1, 2) + 0.5;
+export const CANVAS_MARGIN = 1000;
 
 // State Mutators (since we can't change exported 'let' from other modules in ESM directly without functions)
 // Global State Object for true live bindings across modules
@@ -74,7 +85,17 @@ export const State = {
     get selectedStrokeIndices() { return selectedStrokeIndices; },
     get currentLang() { return currentLang; },
     get clipboardStrokes() { return clipboardStrokes; },
-    get favoriteColors() { return favoriteColors; }
+    get favoriteColors() { return favoriteColors; },
+    get exportQuality() { return exportQuality; },
+    get exportDpi() { return exportDpi; },
+    get exportFormat() { return exportFormat; },
+    get exportAction() { return exportAction; },
+    get exportClipOutOfBounds() { return exportClipOutOfBounds; },
+    get viewClipOutOfBounds() { return viewClipOutOfBounds; },
+    get exportTarget() { return exportTarget; },
+    get exportScale() { return exportScale; },
+    get exportMargin() { return exportMargin; },
+    get exportPreset() { return exportPreset; }
 };
 
 export const setThickness = (val: number) => { currentThickness = val; };
@@ -93,6 +114,16 @@ export const setMoving = (val: boolean) => { isMoving = val; };
 export const setResizing = (val: boolean) => { isResizing = val; };
 export const setRotating = (val: boolean) => { isRotating = val; };
 export const setPanning = (val: boolean) => { isPanning = val; };
+export const setExportQuality = (val: number) => { exportQuality = val; };
+export const setExportDpi = (val: number) => { exportDpi = val; };
+export const setExportFormat = (val: string) => { exportFormat = val; };
+export const setExportAction = (val: string) => { exportAction = val; };
+export const setExportClipOutOfBounds = (val: boolean) => { exportClipOutOfBounds = val; };
+export const setViewClipOutOfBounds = (val: boolean) => { viewClipOutOfBounds = val; };
+export const setExportTarget = (val: { format: string, action: 'download' | 'copy' | 'base64', isBase64?: boolean } | null) => { exportTarget = val; };
+export const setExportScale = (val: number) => { exportScale = val; };
+export const setExportMargin = (val: number) => { exportMargin = val; };
+export const setExportPreset = (val: string) => { exportPreset = val; };
 
 export const setFavoriteColors = (val: string[]) => {
     favoriteColors = val;

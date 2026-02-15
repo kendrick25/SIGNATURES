@@ -7,14 +7,15 @@ import {
     workspace, selectionInfo, selectionBox,
     sidePanel, lastBaseColor, setAlpha,
     container, canvas, selectionCanvas, setWorkspaceScale, customColors,
-    favoriteColors, setFavoriteColors
+    favoriteColors, setFavoriteColors, setExportQuality, setExportDpi, setExportFormat, setExportAction, setExportClipOutOfBounds, setViewClipOutOfBounds, setExportScale, setExportMargin, setExportPreset, CANVAS_MARGIN
 } from '@/scripts/state';
 import {
     saveState, undo, redo, updateThickness, applyStrokeType,
     applyColor, drawSelectionHighlights, updateStrokeStyles,
     updateStrokePreview, downloadPng, downloadSvg, copyPngToClipboard,
     copySelection, pasteSelection, deleteSelection,
-    rotateSelection90, flipSelection, scaleSelection, showToast, updateHintVisibility, safeFromData, copyBase64
+    rotateSelection90, flipSelection, scaleSelection, showToast, updateHintVisibility, safeFromData, copyPngBase64, copySvgBase64,
+    downloadJpg, downloadWebp, copyJpgBase64, copyWebpBase64, triggerExport, updateExportPreview, updateModalContext
 } from '@/scripts/canvas';
 import {
     updateWorkspaceTransform, syncSizeValues,
@@ -53,6 +54,7 @@ export function initAppLogic() {
     initSidebarResizing();
     updateWorkspaceLayout();
     initAdvancedPicker();
+    makeDraggable('exportModal');
 
     // Initial state check for body classes
     if (sidePanel) {
@@ -62,25 +64,24 @@ export function initAppLogic() {
 
     if (signaturePad) {
         // Fix for SignaturePad 5.x: The library expects _createPoint(clientX, clientY, pressure).
-        // It internally subtracts getBoundingClientRect().left/top.
-        // We wrap it to apply our workspace zoom factor (s).
         const originalCreatePoint = (signaturePad as any)._createPoint;
         if (typeof originalCreatePoint === 'function') {
             (signaturePad as any)._createPoint = function (x: number, y: number, pressure: number) {
                 const rect = canvas.getBoundingClientRect();
-
                 // Definitive scale factor: realized screen width / logical layout width
-                // This handles workspace zoom (CSS transform: scale).
-                // Browser zoom is transparent as clientX and rect are both in CSS pixels.
                 const s = rect.width / (canvas.clientWidth || 1);
 
-                // We want the resulting internal point to be: (clientX - rect.left) / s
-                // Since the original method does (x_input - rect.left), we must pass it: 
-                // x_input = rect.left + (clientX - rect.left) / s
-                const x_patched = rect.left + (x - rect.left) / (s || 1);
-                const y_patched = rect.top + (y - rect.top) / (s || 1);
+                // 1. Convert screen to logical canvas coordinates (0 to HUGE)
+                const logicalXHuge = (x - rect.left) / (s || 1);
+                const logicalYHuge = (y - rect.top) / (s || 1);
 
-                return originalCreatePoint.call(this, x_patched, y_patched, pressure);
+                // 2. Subtract margin so (0,0) is at container top-left
+                const logicalX = logicalXHuge - CANVAS_MARGIN;
+                const logicalY = logicalYHuge - CANVAS_MARGIN;
+
+                // 3. SignaturePad internally subtracts rect.left, 
+                // so we pass rect.left + logical coord to counteract it.
+                return originalCreatePoint.call(this, rect.left + logicalX, rect.top + logicalY, pressure);
             };
         }
 
@@ -183,11 +184,11 @@ function setupScrubbing(areaId: string, getValue: () => number, setValue: (v: nu
 
 // --- REFINED COORDINATE MAPPING (Excalidraw Style) ---
 function getCanvasCoordinates(e: any) {
-    if (!canvas || !workspace) return { x: 0, y: 0 };
+    if (!container || !workspace) return { x: 0, y: 0 };
 
-    const rect = canvas.getBoundingClientRect();
-    const sx = rect.width / (canvas.clientWidth || 1);
-    const sy = rect.height / (canvas.clientHeight || 1);
+    const rect = container.getBoundingClientRect();
+    const sx = rect.width / (container.clientWidth || 1);
+    const sy = rect.height / (container.clientHeight || 1);
     const s = (sx + sy) / 2;
 
     const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
@@ -197,6 +198,41 @@ function getCanvasCoordinates(e: any) {
         x: (clientX - rect.left) / (s || 1),
         y: (clientY - rect.top) / (s || 1)
     };
+}
+
+export function updateExportDpi(val: string | number) {
+    let dpi = parseFloat(val.toString());
+    if (isNaN(dpi)) dpi = 96; // Default fallback
+    dpi = Math.max(72, Math.min(10000, dpi));
+    setExportDpi(dpi);
+
+    // Update modal elements
+    const el = document.getElementById('modalDpiVal') as HTMLInputElement;
+    if (el) el.value = Math.round(dpi).toString();
+
+    // Active state managed by click listeners now.
+
+    // If modal is open, update preview
+    if (!document.getElementById('exportModal')?.classList.contains('hidden')) {
+        updateExportPreview();
+    }
+}
+
+export function updateExportQuality(val: string | number) {
+    const quality = Math.max(10, Math.min(100, parseInt(val.toString())));
+    setExportQuality(quality / 100);
+
+    // Update modal elements
+    const valEl = document.getElementById('modalQualityVal');
+    if (valEl) valEl.textContent = quality + '%';
+
+    const slider = document.getElementById('modalQualitySlider') as HTMLInputElement;
+    if (slider) slider.value = quality.toString();
+
+    // If modal is open, update preview
+    if (!document.getElementById('exportModal')?.classList.contains('hidden')) {
+        updateExportPreview();
+    }
 }
 
 
@@ -230,10 +266,55 @@ function attachEventListeners() {
         // Ensure visibility
         if (!isMinimized) {
             sidePanel.style.display = 'flex';
+
+            // Progressive loading of panel sections
+            const groupStroke = document.getElementById('groupStroke');
+            const groupTransform = document.getElementById('groupTransform');
+            const groupCanvas = document.getElementById('groupCanvas');
+
+            // Hide all sections initially
+            if (groupStroke) groupStroke.style.display = 'none';
+            if (groupTransform) groupTransform.style.display = 'none';
+            if (groupCanvas) groupCanvas.style.display = 'none';
+
             requestAnimationFrame(() => {
                 sidePanel.style.opacity = '1';
                 sidePanel.style.transform = sidePanel.classList.contains('docked') ? 'none' : 'translateX(0)';
                 updateWorkspaceLayout();
+
+                // Load sections progressively
+                setTimeout(() => {
+                    if (groupStroke) {
+                        groupStroke.style.display = 'block';
+                        groupStroke.style.opacity = '0';
+                        requestAnimationFrame(() => {
+                            groupStroke.style.transition = 'opacity 0.2s ease-in';
+                            groupStroke.style.opacity = '1';
+                        });
+                    }
+                }, 50);
+
+                setTimeout(() => {
+                    if (groupTransform) {
+                        groupTransform.style.display = 'block';
+                        groupTransform.style.opacity = '0';
+                        requestAnimationFrame(() => {
+                            groupTransform.style.transition = 'opacity 0.2s ease-in';
+                            groupTransform.style.opacity = '1';
+                        });
+                    }
+                }, 150);
+
+                setTimeout(() => {
+                    if (groupCanvas) {
+                        groupCanvas.style.display = 'block';
+                        groupCanvas.style.opacity = '0';
+                        requestAnimationFrame(() => {
+                            groupCanvas.style.transition = 'opacity 0.2s ease-in';
+                            groupCanvas.style.opacity = '1';
+                        });
+                    }
+                }, 250);
             });
         } else {
             updateWorkspaceLayout();
@@ -352,19 +433,60 @@ function attachDynamicListeners() {
             else if (size === 'large') { updateCanvasW(1600); updateCanvasH(800); }
         }
 
-        if (target.closest('#copyPngBtn')) copyPngToClipboard();
-        if (target.closest('#copyBase64Btn')) copyBase64();
-        if (target.closest('#downloadPngBtn')) downloadPng();
-        if (target.closest('#downloadSvgBtn')) downloadSvg();
-
-        const exportMainBtn = target.closest('#exportMainBtn');
-        if (exportMainBtn) {
-            const dropdown = document.getElementById('exportDropdown');
-            if (dropdown) dropdown.classList.toggle('active');
-        } else if (!target.closest('#exportDropdown')) {
-            const dropdown = document.getElementById('exportDropdown');
-            if (dropdown) dropdown.classList.remove('active');
+        const dpiPresetBtn = target.closest('.dpi-presets .preset-btn') as HTMLElement;
+        if (dpiPresetBtn) {
+            updateExportDpi(dpiPresetBtn.dataset.dpi!);
         }
+
+        if (target.closest('#exportMainBtn')) triggerExport();
+
+        const formatBtn = target.closest('#modalFormatSelector .preset-btn') as HTMLElement;
+        if (formatBtn) {
+            setExportFormat(formatBtn.dataset.format!);
+            document.querySelectorAll('#modalFormatSelector .preset-btn').forEach(b => b.classList.remove('active'));
+            formatBtn.classList.add('active');
+            updateModalContext();
+            updateExportPreview();
+        }
+
+        const actionBtn = target.closest('#modalActionSelector .preset-btn') as HTMLElement;
+        if (actionBtn) {
+            setExportAction(actionBtn.dataset.action!);
+            document.querySelectorAll('#modalActionSelector .preset-btn').forEach(b => b.classList.remove('active'));
+            actionBtn.classList.add('active');
+            updateModalContext();
+            updateExportPreview();
+        }
+
+        if (target.closest('#closeExportModal')) {
+            document.getElementById('exportModal')?.classList.add('hidden');
+        }
+
+        if (target.closest('#finalExportBtn')) {
+            const format = State.exportFormat;
+            const action = State.exportAction;
+
+            document.getElementById('exportModal')?.classList.add('hidden');
+
+            if (action === 'download') {
+                if (format === 'PNG') downloadPng();
+                else if (format === 'SVG') downloadSvg();
+                else if (format === 'JPG') downloadJpg();
+                else if (format === 'WEBP') downloadWebp();
+            } else if (action === 'copy') {
+                if (format === 'PNG') copyPngToClipboard();
+                else if (format === 'SVG') copySvgBase64();
+                else if (format === 'JPG') copyJpgBase64();
+                else if (format === 'WEBP') copyWebpBase64();
+            } else if (action === 'base64') {
+                if (format === 'PNG') copyPngBase64();
+                else if (format === 'SVG') copySvgBase64();
+                else if (format === 'JPG') copyJpgBase64();
+                else if (format === 'WEBP') copyWebpBase64();
+            }
+        }
+
+
 
         if (target.closest('#undoBtn')) undo();
         if (target.closest('#redoBtn')) redo();
@@ -377,7 +499,7 @@ function attachDynamicListeners() {
             }
         }
 
-        if (target.closest('#centerCanvasBtn')) recenterCanvas();
+        if (target.closest('#centerCanvasBtn')) autoAdjustCanvas();
         if (target.closest('#resetSizeBtn')) autoAdjustCanvas();
 
         const fullscreenBtn = target.closest('#fullscreenBtn');
@@ -579,6 +701,145 @@ function attachControlListeners() {
         document.body.classList.toggle('dark-mode', e.target.checked);
         document.body.classList.toggle('light-mode', !e.target.checked);
     });
+
+    document.getElementById('modalQualitySlider')?.addEventListener('input', (e: any) => updateExportQuality(e.target.value));
+
+    const modalDpiValEl = document.getElementById('modalDpiVal') as HTMLInputElement;
+    if (modalDpiValEl) modalDpiValEl.onchange = (e: any) => updateExportDpi(e.target.value);
+
+    setupContinuousClick('incModalDpi', () => updateExportDpi(State.exportDpi + 10));
+    setupContinuousClick('decModalDpi', () => updateExportDpi(State.exportDpi - 10));
+    setupScrubbing('modalDpiScrubArea', () => State.exportDpi, (v) => updateExportDpi(v), 2);
+
+    document.getElementById('modalClipToggle')?.addEventListener('change', (e: any) => {
+        setExportClipOutOfBounds(e.target.checked);
+        updateExportPreview();
+    });
+
+    document.getElementById('viewClipToggle')?.addEventListener('change', (e: any) => {
+        setViewClipOutOfBounds(e.target.checked);
+        updateWorkspaceView();
+    });
+
+    // --- New Export Controls ---
+    // --- New Export Controls ---
+    // --- New Export Controls ---
+    const toggleDpiInput = (enable: boolean) => {
+        const input = document.getElementById('modalDpiVal') as HTMLInputElement;
+        const inc = document.getElementById('incModalDpi') as HTMLButtonElement;
+        const dec = document.getElementById('decModalDpi') as HTMLButtonElement;
+        const scrub = document.getElementById('modalDpiScrubArea');
+
+        if (input) input.disabled = !enable;
+        if (inc) inc.disabled = !enable;
+        if (dec) dec.disabled = !enable;
+        if (scrub) scrub.style.pointerEvents = enable ? 'auto' : 'none';
+        if (scrub) scrub.style.opacity = enable ? '1' : '0.5';
+    };
+
+    // Initialize as disabled
+    toggleDpiInput(false);
+
+    // Unified Preset Listener
+    document.querySelectorAll('.dpi-presets .preset-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const b = e.currentTarget as HTMLElement;
+            const dpiData = b.dataset.dpi;
+
+            // Update active state
+            document.querySelectorAll('.dpi-presets .preset-btn').forEach(el => el.classList.remove('active'));
+            b.classList.add('active');
+
+            if (dpiData === 'CUSTOM') {
+                toggleDpiInput(true);
+                setExportPreset('CUSTOM');
+            } else {
+                toggleDpiInput(false);
+                setExportPreset(dpiData || 'DEFAULT');
+            }
+            updateExportPreview();
+        });
+    });
+
+    // Removed setDpiForResolution as it's no longer used for automatic conversion
+
+
+    const updateMargin = (val: number) => {
+        setExportMargin(val);
+        const el = document.getElementById('modalMarginVal');
+        if (el) el.textContent = val + 'px';
+        updateExportPreview();
+    };
+    document.getElementById('modalMarginSlider')?.addEventListener('input', (e: any) => updateMargin(parseInt(e.target.value)));
+
+    const updateExportScale = (val: number) => {
+        const v = parseFloat(val.toString());
+        const final = Math.max(0.5, Math.min(10, v));
+        setExportScale(final);
+        const el = document.getElementById('modalScaleVal');
+        if (el) el.innerText = final + 'x';
+        updateExportPreview();
+    };
+    document.getElementById('modalScaleSlider')?.addEventListener('input', (e: any) => updateExportScale(parseFloat(e.target.value)));
+
+    // Explicit listeners for Action and Format selectors if not already covered
+    document.querySelectorAll('#modalActionSelector .preset-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            const action = target.dataset.action;
+            if (action) {
+                setExportAction(action);
+                // Update active state
+                document.querySelectorAll('#modalActionSelector .preset-btn').forEach(b => b.classList.remove('active'));
+                target.classList.add('active');
+
+                // Update Icon
+                const finalBtn = document.getElementById('finalExportBtn');
+                if (finalBtn) {
+                    const iconName = action === 'download' ? 'download' : (action === 'copy' ? 'copy' : 'file-code');
+                    // Remove existing icon (SVG or i)
+                    const oldIcon = finalBtn.querySelector('i, svg');
+                    if (oldIcon) oldIcon.remove();
+
+                    // Add new icon
+                    const i = document.createElement('i');
+                    i.setAttribute('data-lucide', iconName);
+                    finalBtn.prepend(i);
+                    createIcons(); // content is updated
+                }
+                updateModalContext();
+            }
+        });
+    });
+
+    document.querySelectorAll('#modalFormatSelector .preset-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            const format = target.dataset.format;
+            if (format) {
+                setExportFormat(format);
+                document.querySelectorAll('#modalFormatSelector .preset-btn').forEach(b => b.classList.remove('active'));
+                target.classList.add('active');
+                updateModalContext();
+                updateExportPreview();
+            }
+        });
+    });
+
+    updateWorkspaceView(); // Initialize state
+
+    // Capture points outside canvas during drawing
+    const mainCanvas = document.getElementById('signatureCanvas');
+    if (mainCanvas) {
+        mainCanvas.addEventListener('pointerdown', (e) => {
+            (mainCanvas as HTMLElement).setPointerCapture(e.pointerId);
+        });
+    }
+}
+
+export function updateWorkspaceView() {
+    if (!container) return;
+    container.style.overflow = State.viewClipOutOfBounds ? 'hidden' : 'visible';
 }
 
 function updateCanvasBackground() {
@@ -680,39 +941,119 @@ function updateCanvasBorder() {
 
 // --- Advanced Color Picker Logic ---
 
+// --- Floating Window Logic ---
+
+function makeDraggable(windowId: string) {
+    const picker = document.getElementById(windowId);
+    if (!picker) return;
+
+    // Use header if available, otherwise the element itself (fallback)
+    const handle = picker.querySelector('.window-header') || picker;
+
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    // We store initial offsets relative to the viewport
+    let initialLeft = 0, initialTop = 0;
+
+    handle.addEventListener('pointerdown', (e: any) => {
+        // Ignore clicks on buttons/inputs inside the header
+        if (e.target.closest('button') || e.target.closest('input')) return;
+
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        const rect = picker.getBoundingClientRect();
+        // Since we use transform translate(-50%, -50%) for centering, 'left' and 'top' should track the center point
+        // BUT if it's not centered via transform, we need to adapt.
+        // Assuming the CSS uses: top: 50%; left: 50%; transform: translate(-50%, -50%);
+        // We will switch to direct pixel positioning on drag start to avoid transform complexity, or just update top/left.
+        // Let's stick to updating top/left assuming they are the center point if transform is present.
+
+        // Actually, let's keep it simple: Calculate the current visual top/left and map it.
+        // If transform is present, the 'left/top' style properties might be percentage based initially.
+        // We will convert them to pixels on start.
+
+        // Simpler approach: 
+        // 1. Get current visual rect.
+        // 2. Set margins to 0 and transform to none to take full manual control.
+        // 3. Set top/left to the current rect position.
+
+        // However, this might break centering logic if resizing happens. 
+        // Let's stick to the existing logic but clamp the result.
+
+        // Existing logic uses: 
+        // initialX = rect.left + rect.width / 2;
+        // initialY = rect.top + rect.height / 2;
+        // picker.style.left = ...
+
+        // Let's refine that.
+        initialLeft = rect.left;
+        initialTop = rect.top;
+
+        // We need to account for the fact that setting 'left' might move the element differently if 'transform' is active.
+        // If transform is translate(-50%, -50%), then setting left=X puts the center at X.
+        // The existing code: picker.style.left = `${initialX + dx}px` implies setting center.
+
+        // Let's detect if transform is active.
+        // If we want to constrain it, we need to know the dimensions.
+
+        // If we want to constrain it, we need to know the dimensions.
+        handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener('pointermove', (e: any) => {
+        if (!isDragging) return;
+        e.preventDefault();
+
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        const rect = picker.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+
+        let newLeft = initialLeft + dx;
+        let newTop = initialTop + dy;
+
+        // Constrain to viewport
+        const viewportW = window.innerWidth;
+        const viewportH = window.innerHeight;
+
+        // Clamp (newLeft, newTop) ensures the top-left corner is within [0, W-w] and [0, H-h]
+        newLeft = Math.max(0, Math.min(newLeft, viewportW - width));
+        newTop = Math.max(0, Math.min(newTop, viewportH - height));
+
+        // Now apply to the element. 
+        // If the element has transform: translate(-50%, -50%), then 'left' needs to be center.
+        // rect.left is the visual left edge.
+        // If we want visual left edge to be 'newLeft', and we have translate(-50%), 
+        // then style.left should be newLeft + width/2.
+
+        picker.style.margin = '0'; // Clear auto margins if any
+        picker.style.transform = 'translate(0, 0)'; // Remove centering transform to simplify positioning
+        picker.style.left = `${newLeft}px`;
+        picker.style.top = `${newTop}px`;
+    });
+
+    handle.addEventListener('pointerup', (e: any) => {
+        isDragging = false;
+        handle.releasePointerCapture(e.pointerId);
+    });
+}
+
 let refreshAdvancedPicker: (() => void) | null = null;
 function initAdvancedPicker() {
     const picker = document.getElementById('advancedColorPicker');
-    const header = picker?.querySelector('.window-header');
     const closeBtn = document.getElementById('closeAdvancedPicker');
+    const addFavBtn = document.getElementById('addFavoriteBtn');
 
-    if (header && picker) {
-        let isDragging = false, startX = 0, startY = 0, initialX = 0, initialY = 0;
-        header.addEventListener('pointerdown', (e: any) => {
-            // Don't drag if clicking buttons
-            if (e.target.closest('button')) return;
-            isDragging = true;
-            startX = e.clientX; startY = e.clientY;
-            const rect = picker.getBoundingClientRect();
-            initialX = rect.left + rect.width / 2;
-            initialY = rect.top + rect.height / 2;
-            header.setPointerCapture(e.pointerId);
-        });
-        window.addEventListener('pointermove', (e) => {
-            if (!isDragging) return;
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-            picker.style.left = `${initialX + dx}px`;
-            picker.style.top = `${initialY + dy}px`;
-        });
-        window.addEventListener('pointerup', () => isDragging = false);
-    }
+    makeDraggable('advancedColorPicker');
 
     closeBtn?.addEventListener('click', () => {
         picker?.classList.add('hidden');
     });
 
-    const addFavBtn = document.getElementById('addFavoriteBtn');
     addFavBtn?.addEventListener('click', () => {
         const color = hexInput.value.toUpperCase();
         if (!favoriteColors.includes(color)) {
@@ -1012,13 +1353,13 @@ function handleWheel(e: WheelEvent) {
     if (!workspace || !canvas) return;
     e.preventDefault();
 
-    // 1. Get current physical position of drawing surface
-    const canvasRect = canvas.getBoundingClientRect();
+    // 1. Get current physical position of drawing surface (container)
+    const containerRect = container.getBoundingClientRect();
 
     // 2. Identify the logical "Scene" coordinate under the mouse
     // This is the invariant point we want to keep under the cursor.
-    const sceneX = (e.clientX - canvasRect.left) / State.workspaceScale;
-    const sceneY = (e.clientY - canvasRect.top) / State.workspaceScale;
+    const sceneX = (e.clientX - containerRect.left) / State.workspaceScale;
+    const sceneY = (e.clientY - containerRect.top) / State.workspaceScale;
 
     // 3. Calculate new scale
     const delta = -e.deltaY, factor = 1 + delta * 0.001;
@@ -1028,8 +1369,8 @@ function handleWheel(e: WheelEvent) {
         // 4. Stable "Initial" layout position (pan=0)
         // Since transform-origin is 0,0, the left edge visual position is: InitialLeft + PanX
         // So InitialLeft = current_left - current_pan
-        const initialLayoutX = canvasRect.left - workspacePan.x;
-        const initialLayoutY = canvasRect.top - workspacePan.y;
+        const initialLayoutX = containerRect.left - workspacePan.x;
+        const initialLayoutY = containerRect.top - workspacePan.y;
 
         setWorkspaceScale(newScale);
 
@@ -1367,9 +1708,10 @@ function findStrokesInArea(x1: number, y1: number, x2: number, y2: number, shift
     }
 
     data.forEach((stroke, idx) => {
+        if (!stroke) return;
         let match = false;
         const hitSlop = 15 / actualScaleX;
-        const radius = ((stroke.maxWidth + stroke.minWidth) / 2) + hitSlop;
+        const radius = (((stroke.maxWidth || 0) + (stroke.minWidth || 0)) / 2) + hitSlop;
         const tolerance = 12 / State.workspaceScale;
         const threshold = radius + tolerance;
 

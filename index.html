@@ -8,94 +8,7 @@
     <meta name="description" content="Generador de firmas digitales de alta calidad.">
 
     <!-- Critical CSS for Splash Screen -->
-    <style>
-        body {
-            margin: 0;
-            background-color: #0f172a;
-            overflow: hidden;
-        }
-
-        .main-app-container {
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.5s ease-in;
-        }
-
-        body.ready .main-app-container {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        #splash-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #0f172a;
-            display: flex;
-            z-index: 9999;
-            align-items: center;
-            justify-content: center;
-            transition: opacity 0.5s ease-out, visibility 0.5s;
-        }
-
-        body.ready #splash-screen {
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-        }
-
-        .splash-logo {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #6366f1, #06b6d4);
-            border-radius: 20px;
-            margin-bottom: 2rem;
-            animation: pulse 2s infinite ease-in-out;
-            box-shadow: 0 0 40px rgba(99, 102, 241, 0.4);
-        }
-
-        .splash-loader {
-            width: 200px;
-            height: 2px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .splash-progress {
-            width: 40%;
-            height: 100%;
-            background: #6366f1;
-            animation: loading 1.5s infinite ease-in-out;
-        }
-
-        @keyframes pulse {
-
-            0%,
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-
-            50% {
-                transform: scale(1.1);
-                opacity: 0.8;
-            }
-        }
-
-        @keyframes loading {
-            0% {
-                transform: translateX(-100%);
-            }
-
-            100% {
-                transform: translateX(200%);
-            }
-        }
-    </style>
-
+    <!-- Critical CSS moved to src/styles/_critical.scss -->
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -105,14 +18,15 @@
 </head>
 
 <body class="loading panel-docked panel-minimized" style="background-color: #0f172a;">
-    <div id="splash-screen">
+    <div id="splash-screen"
+        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0f172a; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column;">
         <div class="splash-logo"></div>
         <div class="splash-loader">
             <div class="splash-progress"></div>
         </div>
     </div>
 
-    <div class="main-app-container">
+    <div class="main-app-container" style="opacity: 0; visibility: hidden;">
         <!-- GLOBAL APP HEADER -->
         <header class="app-header">
             <div class="header-main-row">
@@ -128,6 +42,7 @@
                 </div>
 
                 <div class="header-right">
+
                     <button class="navbar-tool-btn" id="settingsToggle" title="Configuración">
                         <i data-lucide="settings"></i>
                     </button>
@@ -141,25 +56,17 @@
                 <div class="header-sub-separator"></div>
                 <div class="tool-group" id="modeToggle"></div>
                 <div class="header-sub-separator"></div>
+                <button class="header-tool-btn" id="centerCanvasBtn" title="Recentrar Lienzo">
+                    <i data-lucide="focus"></i>
+                </button>
                 <div class="header-sub-spacing"></div>
-
-                <div class="tool-group">
-
-                    <button class="header-tool-btn" id="recenterBtnTop" title="Recentrar Lienzo">
-                        <i data-lucide="focus"></i>
-                    </button>
-                </div>
                 <div class="tool-separator"></div>
                 <div class="tool-group" id="historyTools"></div>
                 <div class="tool-separator"></div>
-                <div class="dropdown" id="exportDropdown">
-                    <button class="btn-primary btn-pill" id="exportMainBtn">
-                        <i data-lucide="download"></i>
-                        <span data-i18n="export">EXPORTAR</span>
-                        <i data-lucide="chevron-down"></i>
-                    </button>
-                    <div class="dropdown-menu"></div>
-                </div>
+                <button class="btn-primary btn-pill" id="exportMainBtn">
+                    <i data-lucide="download"></i>
+                    <span data-i18n="export">EXPORTAR</span>
+                </button>
             </div>
         </header>
 
@@ -221,7 +128,7 @@
                             </div>
 
                             <!-- Group TRANSFORMACIÓN -->
-                            <div class="panel-group panel-section-spacing" id="groupTransform">
+                            <div class="panel-group" id="groupTransform">
                                 <div class="panel-row-header">
                                     <span class="panel-group-title" data-i18n="transformation">TRANSFORMACIÓN</span>
                                     <div class="panel-group-actions">
@@ -262,14 +169,25 @@
                             </div>
 
                             <!-- Group LIENZO -->
-                            <div class="panel-group panel-section-spacing" id="groupCanvas">
+                            <div class="panel-group" id="groupCanvas">
                                 <div class="panel-row-header">
                                     <span class="panel-group-title" data-i18n="canvas">LIENZO</span>
                                     <div class="panel-group-actions">
                                     </div>
                                 </div>
-                                <div class="stroke-presets-container" id="canvasSizePresets"></div>
                                 <div class="panel-sub-group">
+                                    <div class="panel-input-group">
+                                        <div
+                                            style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                            <span class="panel-input-label" data-i18n="viewClipOutOfBounds"
+                                                style="margin: 0;">RECORTAR FUERA DEL LIENZO</span>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="viewClipToggle" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="stroke-presets-container" id="canvasSizePresets"></div>
                                     <div class="panel-input-group">
                                         <span class="panel-input-label" data-i18n="width">ANCHO</span>
                                         <div class="thickness-control">
@@ -387,6 +305,9 @@
                                     </div>
                                 </div>
                             </div>
+
+
+
 
 
                         </div>
@@ -511,6 +432,116 @@
                     <div id="currentColorPreview"></div>
                 </div>
                 <button id="applyAdvancedColor" class="apply-btn">Aplicar Color</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Preview & Settings Modal -->
+    <div id="exportModal" class="floating-window hidden">
+        <div class="window-header" style="cursor: grab;">
+            <div class="header-titles">
+                <span class="panel-title-text" data-i18n="exportModalTitle">PREVISUALIZACIÓN Y AJUSTES</span>
+            </div>
+            <div class="header-actions">
+                <button class="close-btn" id="closeExportModal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+        <div class="window-content export-modal-content">
+            <div class="export-preview-box">
+                <div id="exportPreviewContainer">
+                    <!-- High-res preview will be injected here -->
+                </div>
+                <div class="preview-info">
+                    <span id="previewDimensions">836 x 400 PX</span>
+                    <span id="previewFormat">PNG</span>
+                </div>
+            </div>
+
+            <div class="export-settings-form">
+                <div class="panel-input-group">
+                    <span class="panel-input-label" data-i18n="format">FORMATO</span>
+                    <div class="export-format-selector" id="modalFormatSelector">
+                        <button class="preset-btn active" data-format="PNG">PNG</button>
+                        <button class="preset-btn" data-format="JPG">JPG</button>
+                        <button class="preset-btn" data-format="WEBP">WEBP</button>
+                        <button class="preset-btn" data-format="SVG">SVG</button>
+                    </div>
+                </div>
+
+                <div class="panel-input-group">
+                    <span class="panel-input-label" data-i18n="action">ACCIÓN</span>
+                    <div class="export-action-selector" id="modalActionSelector">
+                        <button class="preset-btn active" data-action="download" data-i18n="download">Descargar</button>
+                        <button class="preset-btn" data-action="copy" data-i18n="copyImage">Copiar Imagen</button>
+                        <button class="preset-btn" data-action="base64" data-i18n="copyBase64">Copiar Base64</button>
+                    </div>
+                </div>
+
+                <div class="panel-input-group" id="modalQualityGroup">
+                    <div class="panel-input-header">
+                        <span class="panel-input-label" data-i18n="quality">CALIDAD</span>
+                        <span id="modalQualityVal" class="panel-val-text">92%</span>
+                    </div>
+                    <input type="range" id="modalQualitySlider" min="10" max="100" step="1" value="92"
+                        class="canvas-range">
+                </div>
+
+                <div class="panel-input-group" id="modalDpiGroup">
+                    <span class="panel-input-label" data-i18n="dpi">DPI / RESOLUCIÓN</span>
+                    <div class="dpi-presets">
+                        <button class="preset-btn small-preset active" id="modalDpiDefault">DEFAULT</button>
+                        <button class="preset-btn small-preset" data-dpi="CUSTOM" id="modalDpiCustom">EDIT</button>
+                        <button class="preset-btn small-preset" data-dpi="HD">HD</button>
+                        <button class="preset-btn small-preset" data-dpi="FHD">FHD</button>
+                        <button class="preset-btn small-preset" data-dpi="4K">4K</button>
+                    </div>
+                    <div class="thickness-control" id="dpiControlWrapper" style="margin-top: 8px;">
+                        <button class="scrub-btn" id="decModalDpi"><i data-lucide="minus"></i></button>
+                        <div class="scrub-area" id="modalDpiScrubArea">
+                            <input type="number" class="thickness-input" id="modalDpiVal" value="300" min="72"
+                                max="1200">
+                            <span class="zoom-unit">DPI</span>
+                        </div>
+                        <button class="scrub-btn" id="incModalDpi"><i data-lucide="plus"></i></button>
+                    </div>
+                </div>
+
+                <div class="panel-input-group">
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                        <span class="panel-input-label" style="margin: 0;">RECORTAR FUERA DEL LIENZO</span>
+                        <label class="switch-small">
+                            <input type="checkbox" id="modalClipToggle" checked>
+                            <span class="slider-small"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="panel-input-group">
+                    <div class="panel-input-header">
+                        <span class="panel-input-label small">MARGEN DE SEGURIDAD</span>
+                        <span id="modalMarginVal" class="panel-val-text small">0px</span>
+                    </div>
+                    <input type="range" id="modalMarginSlider" min="0" max="200" step="5" value="0"
+                        class="canvas-range small">
+                </div>
+
+                <div class="panel-input-group">
+                    <div class="panel-input-header">
+                        <span class="panel-input-label">ESCALA EXTRA</span>
+                        <span id="modalScaleVal" class="panel-val-text">1x</span>
+                    </div>
+                    <input type="range" id="modalScaleSlider" min="1" max="10" step="0.5" value="1"
+                        class="canvas-range">
+                </div>
+
+                <div class="export-actions">
+                    <button id="finalExportBtn" class="apply-btn">
+                        <i data-lucide="download"></i>
+                        <span id="finalBtnText" data-i18n="confirmExport">EXPORTAR AHORA</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>

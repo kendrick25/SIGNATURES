@@ -55,7 +55,7 @@ export function syncControlsWithSelection() {
     if (State.selectedStrokeIndices.length === 0) return;
     const data = signaturePad.toData();
     const first = data[State.selectedStrokeIndices[0]];
-    if (!first) return;
+    if (!first || typeof first.maxWidth === 'undefined' || typeof first.minWidth === 'undefined') return;
 
     const currentThicknessVal = (first.maxWidth + first.minWidth) / 2;
     const strokeColor = first.penColor || '#ffffff';
@@ -84,7 +84,7 @@ export function syncControlsWithSelection() {
         dot.classList.toggle('active', dot.getAttribute('data-color')?.toLowerCase() === base.toLowerCase());
     });
 
-    const variety = first.maxWidth / (first.minWidth || 0.1);
+    const variety = (first.maxWidth || 0) / (first.minWidth || 0.1);
     let detectedType = 'natural';
     if (variety >= 7) detectedType = 'brush';
     else if (variety >= 3) detectedType = 'pen';

@@ -6,6 +6,7 @@
 @use 'docked_panels';
 @use 'indicator';
 @use 'reorder';
+@use 'modal';
 
 
 * {
@@ -589,7 +590,8 @@ button:disabled {
 
 .preset-btn {
     flex: 1 1 auto;
-    min-width: fit-content;
+    min-width: 0;
+    /* Let grid control width */
     white-space: nowrap;
     padding: 0.5rem 0.75rem;
     border-radius: 8px;
