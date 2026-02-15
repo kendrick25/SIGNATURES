@@ -10,7 +10,7 @@ export function initApp() {
     const hint = document.getElementById('canvasHint') as HTMLElement;
     const workspace = document.getElementById('workspace') as HTMLElement;
     const selectionCanvas = document.getElementById('selectionCanvas') as HTMLCanvasElement;
-    const selectionBox = document.getElementById('selectionBox') as HTMLElement;
+    const selectionBox = document.getElementById('dragSelection') as HTMLElement;
     const selectionInfo = document.getElementById('selectionInfo') as HTMLElement;
     const sidePanel = document.getElementById('sidePanel') as HTMLElement;
 

@@ -181,10 +181,10 @@ export function recenterCanvas() {
     const containerWidth = container.offsetWidth;
     const containerHeight = container.offsetHeight;
 
-    // Calculate top-left position to center at scale 1
-    // We treat this centered position as the "natural" origin for workspacePan
-    workspacePan.x = (viewportRect.width - containerWidth) / 2;
-    workspacePan.y = (viewportRect.height - containerHeight) / 2;
+    // Calculate top-left position to center the SCALED container
+    // Since transform-origin is 0 0, the physical space occupied is (originalSize * scale)
+    workspacePan.x = (viewportRect.width - containerWidth * workspaceScale) / 2;
+    workspacePan.y = (viewportRect.height - containerHeight * workspaceScale) / 2;
 
     updateWorkspaceTransform();
 }

@@ -264,7 +264,7 @@
     overflow: hidden;
     transform-origin: 0 0;
     will-change: transform;
-    outline: 1px solid rgba(255, 255, 255, 0.08); // Use outline instead of border for visual only
+    border: 1px solid rgba(255, 255, 255, 0.08); // Default border to allow radius support
 
     &::after {
         content: '';
@@ -423,10 +423,11 @@ canvas#signatureCanvas {
 
 .selection-box {
     position: absolute;
-    border: 1px dashed var(--primary);
-    background: rgba(99, 102, 241, 0.1);
+    border: 1.5px dashed var(--primary);
+    background: rgba(99, 102, 241, 0.25);
     display: none;
-    z-index: 100;
+    z-index: 1000;
+    pointer-events: none;
 }
 
 .selected-stroke-info {
@@ -476,6 +477,12 @@ canvas#signatureCanvas {
         border-bottom: 1px solid var(--glass-border);
         text-transform: uppercase;
         width: 100%;
+    }
+
+    .settings-label {
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: var(--text-main);
     }
 
     /* Reuse existing config group styles but scoped */

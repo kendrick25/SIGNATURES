@@ -35,6 +35,11 @@ export let redoStack: HistoryItem[] = [];
 export let selectedStrokeIndices: number[] = [];
 export let clipboardStrokes: any[] = [];
 export let currentLang = 'es';
+export let customColors: Record<string, string> = {
+    colorPicker: '',
+    canvasBgPicker: '',
+    canvasBorderColorPicker: ''
+};
 
 export let isSelecting = false;
 export let isMoving = false;

@@ -1,5 +1,5 @@
 import { createIcons as lucideCreateIcons, icons } from 'lucide';
-import { currentLang, UIConfig, I18nContent, setDynamicRefs } from '@/scripts/state';
+import { currentLang, UIConfig, I18nContent, setDynamicRefs, customColors } from '@/scripts/state';
 
 // ... (skipping i18n and UI_CONFIG constant definitions which are huge)
 
@@ -59,7 +59,16 @@ export const i18n: I18nContent = {
         float: "Flotar",
         dock: "Fijar",
         workspaceTitle: "ESPACIO DE TRABAJO",
-        settings: "CONFIGURACIÓN"
+        settings: "CONFIGURACIÓN",
+        backgroundColor: "COLOR DE FONDO",
+        borderRadius: "RADIO DE BORDE",
+        borderType: "TIPO DE BORDE",
+        borderColor: "COLOR DE BORDE",
+        borderWidth: "GROSOR DE BORDE",
+        solid: "Sólido",
+        dashed: "Guiones",
+        dotted: "Puntos",
+        borderSpacing: "ESPACIADO DE BORDE"
     },
     en: {
         drawMode: "Drawing Mode (P)",
@@ -115,7 +124,16 @@ export const i18n: I18nContent = {
         float: "Float",
         dock: "Dock",
         workspaceTitle: "WORKSPACE",
-        settings: "SETTINGS"
+        settings: "SETTINGS",
+        backgroundColor: "BACKGROUND COLOR",
+        borderRadius: "BORDER RADIUS",
+        borderType: "BORDER TYPE",
+        borderColor: "BORDER COLOR",
+        borderWidth: "BORDER WIDTH",
+        solid: "Solid",
+        dashed: "Dashed",
+        dotted: "Dotted",
+        borderSpacing: "BORDER SPACING"
     }
 };
 
@@ -123,7 +141,7 @@ export const UI_CONFIG: UIConfig = {
     modes: [
         { id: 'draw', icon: 'Pencil', titleKey: 'drawMode', shortcut: 'P' },
         { id: 'select', icon: 'MousePointer2', titleKey: 'selectMode', shortcut: 'V' },
-        { id: 'transform', icon: 'MoveDiagonal', titleKey: 'transformMode', shortcut: 'T' },
+        { id: 'transform', icon: 'Move', titleKey: 'transformMode', shortcut: 'T' },
         { id: 'pan', icon: 'Hand', titleKey: 'panMode', shortcut: 'H' }
     ],
     tools: [
@@ -139,6 +157,7 @@ export const UI_CONFIG: UIConfig = {
         { id: 'brush', preset: 'brush', key: 'brush' }
     ],
     colors: [
+        { color: 'transparent', label: 'none' },
         { color: '#ffffff', active: true },
         { color: '#6366f1' },
         { color: '#06b6d4' },
@@ -174,7 +193,9 @@ export function renderUIComponents() {
     renderTools();
     renderExportOptions();
     renderStrokePresets();
-    renderColorPicker();
+    renderColorPicker('colorPicker');
+    renderColorPicker('canvasBgPicker');
+    renderColorPicker('canvasBorderColorPicker');
     renderCanvasPresets();
     renderSettings();
     renderWorkspaceShortcuts();
@@ -253,22 +274,47 @@ function renderStrokePresets() {
     `).join('');
 }
 
-function renderColorPicker() {
-    const container = document.getElementById('colorPicker');
+function renderColorPicker(containerId: string) {
+    const container = document.getElementById(containerId);
     if (!container) return;
 
-    const dots = UI_CONFIG.colors.map(c => `
-        <div class="color-dot ${c.active ? 'active' : ''}" 
-             style="background: ${c.color}; ${c.border ? 'border: 1px solid var(--glass-border);' : ''}" 
-             data-color="${c.color}"></div>
-    `).join('');
+    const isBackground = containerId === 'canvasBgPicker';
+    const isBorder = containerId === 'canvasBorderColorPicker';
+
+    const dots = UI_CONFIG.colors.map(c => {
+        let active = c.active;
+        if (isBackground) active = c.color === '#0d1117';
+        if (isBorder) active = c.color === 'rgba(255, 255, 255, 0.08)';
+
+        // If a custom color is active for this picker, standard dots are not active
+        if (customColors[containerId]) active = false;
+
+        let dotStyle = `background: ${c.color};`;
+        if (c.color === 'transparent') {
+            dotStyle = `background: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 8px 8px; background-position: 0 0, 0 4px, 4px 4px, 4px 0; background-color: #fff;`;
+        }
+        if (c.border) dotStyle += 'border: 1px solid var(--glass-border);';
+
+        return `
+            <div class="color-dot ${active ? 'active' : ''}" 
+                 style="${dotStyle}" 
+                 data-color="${c.color}"></div>
+        `;
+    }).join('');
+
+    const customColor = customColors[containerId];
+    const customDotHtml = customColor ? `
+        <div class="color-dot custom-selected-dot active" style="background: ${customColor}" data-color="${customColor}"></div>
+    ` : `
+        <div class="color-dot custom-selected-dot hidden" data-color=""></div>
+    `;
 
     container.innerHTML = `
         ${dots}
-        <div class="custom-color-btn" id="customColorBtn" title="Color personalizado">
-            <i data-lucide="Plus"></i>
+        ${customDotHtml}
+        <div class="custom-color-btn" title="Color personalizado">
+            <i data-lucide="plus"></i>
         </div>
-        <input type="color" id="hiddenColorInput" style="display: none;">
     `;
 }
 

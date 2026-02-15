@@ -51,6 +51,180 @@ body {
     }
 }
 
+.floating-window {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 280px;
+    background: var(--surface-light, #1e293b);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+    user-select: none;
+
+    &.hidden {
+        display: none;
+    }
+
+    .window-header {
+        padding: 10px 16px;
+        background: rgba(255, 255, 255, 0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: move;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-dim);
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+
+            &:hover {
+                color: white;
+            }
+
+            svg {
+                width: 14px;
+                height: 14px;
+            }
+        }
+    }
+
+    .window-content {
+        padding: 16px;
+    }
+
+    .picker-main {
+        position: relative;
+        width: 100%;
+        height: 180px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+
+        #colorCanvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            cursor: crosshair;
+        }
+
+        #colorCursor {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+        }
+    }
+
+    .picker-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .hue-slider-container {
+        #hueSlider {
+            width: 100%;
+            height: 10px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+            border-radius: 5px;
+
+            &::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                width: 14px;
+                height: 14px;
+                background: white;
+                border-radius: 50%;
+                cursor: pointer;
+                box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+            }
+        }
+    }
+
+    .rgb-inputs {
+        display: flex;
+        gap: 8px;
+
+        .rgb-field {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+
+            span {
+                font-size: 0.6rem;
+                color: var(--text-dim);
+            }
+
+            input {
+                width: 100%;
+                background: rgba(0, 0, 0, 0.2);
+                border: 1px solid var(--glass-border);
+                color: white;
+                font-size: 0.7rem;
+                padding: 4px;
+                border-radius: 4px;
+                text-align: center;
+            }
+        }
+    }
+
+    .hex-input-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        span {
+            font-size: 0.6rem;
+            color: var(--text-dim);
+        }
+
+        input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            color: white;
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+    }
+
+    .apply-btn {
+        width: 100%;
+        padding: 8px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+
+        &:hover {
+            filter: brightness(1.1);
+        }
+    }
+}
+
 h1 {
     font-family: 'Outfit', sans-serif;
     font-size: 3rem;

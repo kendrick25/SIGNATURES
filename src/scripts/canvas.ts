@@ -1,6 +1,7 @@
-import { State, signaturePad, history, redoStack, setSelectedIndices, setRedoStack, hint, setThickness, setLastColor, sctx, selectionCanvas, setStrokeType, ratio, setClipboardStrokes } from '@/scripts/state';
+import { State, signaturePad, history, redoStack, setSelectedIndices, setRedoStack, hint, setThickness, setLastColor, sctx, selectionCanvas, setStrokeType, ratio, setClipboardStrokes, canvas, container } from '@/scripts/state';
 import { updateSelectedBounds, syncControlsWithSelection, updateTransformPanelState } from '@/scripts/ui_updates';
 import { i18n } from '@/scripts/data';
+import { currentCanvasBorderStyle, currentRadiusUnit } from '@/scripts/main';
 
 export function saveState() {
     const data = JSON.parse(JSON.stringify(signaturePad.toData()));
@@ -279,12 +280,88 @@ export function showToast(message: string, color = "#10b981") {
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
+function getExportCanvas() {
+    const mainCanvas = canvas;
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = mainCanvas.width;
+    exportCanvas.height = mainCanvas.height;
+    const ectx = exportCanvas.getContext("2d");
+    if (!ectx) return mainCanvas;
+
+    const canvasContainer = container;
+    if (!canvasContainer) return mainCanvas;
+    const computedStyle = window.getComputedStyle(canvasContainer);
+
+    // 1. Prepare Background & Clipping
+    const radiusRaw = parseFloat((document.getElementById('radiusSlider') as HTMLInputElement)?.value || "0");
+    const radius = currentRadiusUnit === '%' ? (radiusRaw / 100) * Math.min(exportCanvas.width, exportCanvas.height) : radiusRaw * ratio;
+
+    const bgColor = canvasContainer.style.backgroundColor;
+    // Only fill if not transparent and EXPLICITLY set by the user (inline style)
+    const isTransparent = !bgColor || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'rgba(255, 255, 255, 0)';
+
+    if (!isTransparent) {
+        ectx.fillStyle = bgColor;
+        if (radius > 0) {
+            ectx.beginPath();
+            ectx.roundRect(0, 0, exportCanvas.width, exportCanvas.height, radius);
+            ectx.fill();
+            ectx.clip();
+        } else {
+            ectx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        }
+    } else if (radius > 0) {
+        // If transparent but has radius, we still clip for the border/content
+        ectx.beginPath();
+        ectx.roundRect(0, 0, exportCanvas.width, exportCanvas.height, radius);
+        ectx.clip();
+    }
+
+    // 2. Draw the Signature Pad content
+    ectx.drawImage(mainCanvas, 0, 0);
+
+    // 3. Draw Border if any
+    const borderSlider = document.getElementById('borderWidthSlider') as HTMLInputElement;
+    const widthVal = parseFloat(borderSlider?.value || "0");
+    const width = widthVal * ratio;
+    const style = currentCanvasBorderStyle;
+    const color = canvasContainer.style.borderColor || computedStyle.borderColor || "rgba(255, 255, 255, 0.08)";
+
+    // We only handle basic solid borders for PNG export easily. 
+    // Complex SVG-based borders are harder to replicate exactly on canvas,
+    // but we can try a simplified version.
+    if (width > 0 && style !== 'none') {
+        ectx.strokeStyle = color;
+        ectx.lineWidth = width * ratio; // Adjust for device pixel ratio
+        const dashVal = parseInt((document.getElementById('borderDashSlider') as HTMLInputElement)?.value || '4') * ratio;
+
+        if (style === 'dashed') ectx.setLineDash([dashVal, dashVal]);
+        else if (style === 'dotted') ectx.setLineDash([1, dashVal]);
+        else ectx.setLineDash([]);
+
+        const inset = width / 2;
+        // Adjust radius for the border to keep it aligned with the background clipping
+        const borderRadius = Math.max(0, radius - inset);
+
+        if (radius > 0) {
+            ectx.beginPath();
+            ectx.roundRect(inset, inset, exportCanvas.width - width, exportCanvas.height - width, borderRadius);
+            ectx.stroke();
+        } else {
+            ectx.strokeRect(inset, inset, exportCanvas.width - width, exportCanvas.height - width);
+        }
+    }
+
+    return exportCanvas;
+}
+
 export function downloadPng() {
     if (signaturePad.isEmpty()) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
-    const dataURL = signaturePad.toDataURL("image/png");
+    const exportCanvas = getExportCanvas();
+    const dataURL = exportCanvas.toDataURL("image/png");
     const link = document.createElement("a");
     link.download = `firma-${Date.now()}.png`;
     link.href = dataURL;
@@ -297,10 +374,47 @@ export function downloadSvg() {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
-    const svgData = signaturePad.toDataURL("image/svg+xml");
+
+    // For SVG, we need to wrap signaturePad's SVG output with our background/border
+    const originalSvgUrl = signaturePad.toDataURL("image/svg+xml");
+    const svgContent = atob(originalSvgUrl.split(',')[1]);
+
+    const canvasContainer = container!;
+    const computedStyle = window.getComputedStyle(canvasContainer);
+    // Only use inline style for background to support transparency by default/unless selected
+    const bgColor = canvasContainer.style.backgroundColor;
+    const isTransparent = !bgColor || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'rgba(255, 255, 255, 0)';
+
+    const borderRadiusRaw = (document.getElementById('radiusSlider') as HTMLInputElement)?.value || '0';
+    const borderRadius = borderRadiusRaw + currentRadiusUnit;
+    const borderWidthVal = (document.getElementById('borderWidthSlider') as HTMLInputElement)?.value || '0';
+    const borderColor = canvasContainer.style.borderColor || computedStyle.borderColor || "rgba(255, 255, 255, 0.08)";
+    const borderStyle = currentCanvasBorderStyle;
+
+    const w = canvasContainer.offsetWidth;
+    const h = canvasContainer.offsetHeight;
+
+    let dashAttr = "";
+    const dashVal = (document.getElementById('borderDashSlider') as HTMLInputElement)?.value || '4';
+    if (borderStyle === 'dashed') dashAttr = `stroke-dasharray="${dashVal}, ${dashVal}"`;
+    if (borderStyle === 'dotted') dashAttr = `stroke-dasharray="1, ${dashVal}"`;
+
+    // Wrap the signature paths inside a new SVG with background rect
+    const wrappedSvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+            ${!isTransparent ? `<rect width="100%" height="100%" fill="${bgColor}" rx="${borderRadius}" ry="${borderRadius}" />` : ''}
+            ${svgContent.replace('<svg ', '<g ').replace('</svg>', '</g>')}
+            ${borderWidthVal !== '0' && borderStyle !== 'none' ?
+            `<rect x="${parseFloat(borderWidthVal) / 2}" y="${parseFloat(borderWidthVal) / 2}" 
+                       width="${w - parseFloat(borderWidthVal)}" height="${h - parseFloat(borderWidthVal)}" 
+                       fill="none" stroke="${borderColor}" stroke-width="${borderWidthVal}" 
+                       rx="${borderRadius}" ry="${borderRadius}" ${dashAttr} />` : ''}
+        </svg>
+    `;
+
     const link = document.createElement("a");
     link.download = `firma-${Date.now()}.svg`;
-    link.href = svgData;
+    link.href = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(wrappedSvg)));
     link.click();
     showToast(i18n[State.currentLang as keyof typeof i18n].toastSvgDownloaded);
 }
@@ -311,9 +425,10 @@ export async function copyPngToClipboard() {
         return;
     }
     try {
-        const dataURL = signaturePad.toDataURL("image/png");
-        const resp = await fetch(dataURL);
-        const blob = await resp.blob();
+        const exportCanvas = getExportCanvas();
+        const blob = await new Promise<Blob | null>(res => exportCanvas.toBlob(res, "image/png"));
+        if (!blob) throw new Error("Canvas to Blob failed");
+
         await navigator.clipboard.write([
             new ClipboardItem({ "image/png": blob })
         ]);
