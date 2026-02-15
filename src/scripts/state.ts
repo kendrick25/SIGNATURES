@@ -52,8 +52,9 @@ export let isPanning = false;
 
 export let workspacePan = { x: 0, y: 0 };
 export let workspaceScale = 1.0;
-// Vector-Quality: We boost the internal resolution beyond the standard DPR to ensure crispness even when zoomed.
-export let ratio = Math.max(window.devicePixelRatio || 1, 2) * 2;
+// Super-Sampling Ratio: 2x or 3x is usually the sweet spot for browsers. 
+// 4x or higher can sometimes trigger "fast/low-quality" scaling paths in GPUs.
+export let ratio = Math.max(window.devicePixelRatio || 1, 2) + 0.5;
 
 // State Mutators (since we can't change exported 'let' from other modules in ESM directly without functions)
 // Global State Object for true live bindings across modules

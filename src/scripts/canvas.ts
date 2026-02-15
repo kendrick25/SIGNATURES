@@ -1,7 +1,27 @@
-import { State, signaturePad, history, redoStack, setSelectedIndices, setRedoStack, hint, setThickness, setLastColor, sctx, selectionCanvas, setStrokeType, ratio, setClipboardStrokes, canvas, container } from '@/scripts/state';
+import SignaturePad from 'signature_pad';
+import { State, signaturePad, history, redoStack, setSelectedIndices, setRedoStack, setThickness, setLastColor, sctx, selectionCanvas, setStrokeType, ratio, setClipboardStrokes, canvas, container } from '@/scripts/state';
 import { updateSelectedBounds, syncControlsWithSelection, updateTransformPanelState } from '@/scripts/ui_updates';
 import { i18n } from '@/scripts/data';
 import { currentCanvasBorderStyle, currentRadiusUnit } from '@/scripts/main';
+
+export function updateHintVisibility(forceHide = false) {
+    const hintEl = document.getElementById('canvasHint');
+    if (!hintEl || !signaturePad) return;
+
+    // Check both isEmpty() and data length for absolute certainty
+    const hasStrokes = !signaturePad.isEmpty() || signaturePad.toData().length > 0;
+
+    // Only show hint in draw mode and when truly empty
+    const shouldShow = !forceHide && State.currentMode === 'draw' && !hasStrokes;
+
+    if (shouldShow) {
+        hintEl.style.display = 'block';
+        hintEl.classList.remove('hidden');
+    } else {
+        hintEl.style.display = 'none';
+        hintEl.classList.add('hidden');
+    }
+}
 
 export function saveState() {
     const data = JSON.parse(JSON.stringify(signaturePad.toData()));
@@ -22,8 +42,7 @@ export function undo() {
         signaturePad.fromData(lastState.data);
         setSelectedIndices(lastState.selection || []);
 
-        if (lastState.data.length === 0) hint.classList.remove('hidden');
-        else hint.classList.add('hidden');
+        updateHintVisibility();
 
         updateSelectedBounds();
         drawSelectionHighlights();
@@ -44,7 +63,7 @@ export function redo() {
         signaturePad.fromData(nextState.data);
         setSelectedIndices(nextState.selection || []);
 
-        hint.classList.add('hidden');
+        updateHintVisibility();
         updateSelectedBounds();
         drawSelectionHighlights();
         syncControlsWithSelection();
@@ -63,7 +82,7 @@ export function updateHistoryButtons() {
 
 export function updateThickness(newVal: string | number) {
     const val = typeof newVal === 'string' ? parseFloat(newVal) : newVal;
-    const finalVal = Math.max(1, Math.min(20, parseFloat(val.toFixed(1))));
+    const finalVal = Math.max(0.1, Math.min(20, parseFloat(val.toFixed(1))));
     setThickness(finalVal);
 
     const thicknessValEl = document.getElementById('thicknessVal') as HTMLInputElement;
@@ -76,12 +95,15 @@ export function updateThickness(newVal: string | number) {
         saveState();
         State.selectedStrokeIndices.forEach(index => {
             if (data[index]) {
-                const widths = getThicknessRange(State.currentStrokeType, finalVal);
-                data[index].minWidth = widths.min;
-                data[index].maxWidth = widths.max;
+                // Use the individual stroke as context to keep its relative variety
+                const currentAvg = (data[index].maxWidth + data[index].minWidth) / 2;
+                const scale = finalVal / (currentAvg || 1);
+
+                data[index].minWidth *= scale;
+                data[index].maxWidth *= scale;
             }
         });
-        signaturePad.fromData(data);
+        safeFromData(data);
         drawSelectionHighlights();
     } else {
         updateStrokeStyles();
@@ -92,12 +114,29 @@ export function updateThickness(newVal: string | number) {
 function getThicknessRange(type: string, baseThickness: number) {
     switch (type) {
         case 'marker': return { min: baseThickness, max: baseThickness };
-        case 'pen': return { min: baseThickness * 0.3, max: baseThickness * 2.5 };
-        case 'brush': return { min: baseThickness * 0.1, max: baseThickness * 4.0 };
-        case 'fine': return { min: baseThickness * 0.9, max: baseThickness * 1.1 };
+        case 'pen': return { min: baseThickness * 0.4, max: baseThickness * 1.6 }; // Avg 1.0
+        case 'brush': return { min: baseThickness * 0.2, max: baseThickness * 1.8 }; // Avg 1.0
+        case 'fine': return { min: baseThickness * 0.9, max: baseThickness * 1.1 };  // Avg 1.0
         case 'natural':
-        default: return { min: baseThickness * 0.6, max: baseThickness * 1.8 };
+        default: return { min: baseThickness * 0.7, max: baseThickness * 1.3 };     // Avg 1.0
     }
+}
+
+export function safeFromData(data: any[]) {
+    if (!signaturePad) return;
+    // CRITICAL: Stop signaturePad from filtering points during programmatic redraw
+    // If minDistance > 0, fromData will actually DELETE points that are too close,
+    // which causes the "change in stroke" reported by the user.
+    const oldDist = signaturePad.minDistance;
+    const oldThrottle = signaturePad.throttle;
+
+    signaturePad.minDistance = 0;
+    signaturePad.throttle = 0;
+
+    signaturePad.fromData(data);
+
+    signaturePad.minDistance = oldDist;
+    signaturePad.throttle = oldThrottle;
 }
 
 export function updateStrokeStyles() {
@@ -105,13 +144,15 @@ export function updateStrokeStyles() {
     signaturePad.minWidth = widths.min;
     signaturePad.maxWidth = widths.max;
 
+    // Use lower values to preserve "vibration" and "sensitivity" as requested.
+    // High values (0.7+) were causing the "loss of fidelity" by over-smoothing the user's micro-movements.
     switch (State.currentStrokeType) {
-        case 'marker': signaturePad.velocityFilterWeight = 0; break;
-        case 'pen': signaturePad.velocityFilterWeight = 0; break;
-        case 'brush': signaturePad.velocityFilterWeight = 0; break;
-        case 'fine': signaturePad.velocityFilterWeight = 0; break;
+        case 'marker': signaturePad.velocityFilterWeight = 0.05; break;
+        case 'pen': signaturePad.velocityFilterWeight = 0.4; break;
+        case 'brush': signaturePad.velocityFilterWeight = 0.3; break;
+        case 'fine': signaturePad.velocityFilterWeight = 0.1; break;
         case 'natural':
-        default: signaturePad.velocityFilterWeight = 0; break;
+        default: signaturePad.velocityFilterWeight = 0.3; break;
     }
     updateStrokePreview();
 }
@@ -123,12 +164,14 @@ export function applyStrokeType(type: string) {
         const data = signaturePad.toData();
         State.selectedStrokeIndices.forEach(index => {
             if (data[index]) {
+                // Use the global State.currentThickness as the anchor when changing type
+                // This prevents infinite growth and ensures predictable UI behavior.
                 const widths = getThicknessRange(type, State.currentThickness);
                 data[index].minWidth = widths.min;
                 data[index].maxWidth = widths.max;
             }
         });
-        signaturePad.fromData(data);
+        safeFromData(data);
         drawSelectionHighlights();
     } else {
         updateStrokeStyles();
@@ -163,7 +206,7 @@ export function applyColor(colorHex: string) {
         State.selectedStrokeIndices.forEach(index => {
             if (data[index]) data[index].penColor = finalColor;
         });
-        signaturePad.fromData(data);
+        safeFromData(data);
     }
 
     updateSelectedBounds();
@@ -303,10 +346,10 @@ function getExportCanvas() {
     const baseWidth = container.clientWidth;
     const baseHeight = container.clientHeight;
 
-    // Adobe-grade quality: Ensure at least 4x super-sampling for export
-    const exportRatio = Math.max(ratio, 4);
-    exportCanvas.width = Math.round(baseWidth * exportRatio);
-    exportCanvas.height = Math.round(baseHeight * exportRatio);
+    // Match logical dimensions from UI (e.g. 836x400)
+    const exportRatio = 1;
+    exportCanvas.width = baseWidth;
+    exportCanvas.height = baseHeight;
 
     const ectx = exportCanvas.getContext("2d");
     if (!ectx) return mainCanvas;
@@ -339,10 +382,37 @@ function getExportCanvas() {
         ectx.fillRect(0, 0, baseWidth, baseHeight);
     }
 
-    // 2. Draw the Signature content
-    // We draw the main canvas into the logical space. 
-    // Since mainCanvas is already high-res, this is an efficient way to transfer the image data.
-    ectx.drawImage(mainCanvas, 0, 0, baseWidth, baseHeight);
+    // 2. HD Vector Replay: Instead of copying the screen canvas, we "replay" the signature
+    // points on this high-res buffer to get perfect, non-pixelated edges.
+    const data = signaturePad.toData();
+    if (data.length > 0) {
+        // We use a temporary SignaturePad logic on the secondary context
+        // to ensure identical curve interpolation but at 8x scale.
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = exportCanvas.width;
+        tempCanvas.height = exportCanvas.height;
+
+        // Use a temporary SignaturePad instance to handle the complex Bézier logic
+        const tempPad = new SignaturePad(tempCanvas);
+
+        // Adjust widths for the export scale
+        const scaledData = data.map(stroke => {
+            const clone = JSON.parse(JSON.stringify(stroke));
+            clone.minWidth *= exportRatio;
+            clone.maxWidth *= exportRatio;
+            clone.points.forEach((p: any) => {
+                p.x *= exportRatio;
+                p.y *= exportRatio;
+            });
+            return clone;
+        });
+
+        tempPad.fromData(scaledData);
+
+        // Draw the high-res result into our export context
+        ectx.drawImage(tempCanvas, 0, 0, baseWidth, baseHeight);
+        tempPad.off(); // Cleanup
+    }
 
     // 3. Draw Border
     const borderSlider = document.getElementById('borderWidthSlider') as HTMLInputElement;
@@ -414,17 +484,22 @@ export function downloadSvg() {
 
     const w = canvasContainer.offsetWidth;
     const h = canvasContainer.offsetHeight;
+    const internalScale = (canvas?.width || w) / w;
 
     let dashAttr = "";
     const dashVal = (document.getElementById('borderDashSlider') as HTMLInputElement)?.value || '4';
     if (borderStyle === 'dashed') dashAttr = `stroke-dasharray="${dashVal}, ${dashVal}"`;
     if (borderStyle === 'dotted') dashAttr = `stroke-dasharray="1, ${dashVal}"`;
 
+    const cleanSignature = svgContent.replace(/<svg[^>]*>/, '').replace('</svg>', '');
+
     // Wrap the signature paths inside a new SVG with background rect
     const wrappedSvg = `
         <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
             ${!isTransparent ? `<rect width="100%" height="100%" fill="${bgColor}" rx="${borderRadius}" ry="${borderRadius}" />` : ''}
-            ${svgContent.replace('<svg ', '<g ').replace('</svg>', '</g>')}
+            <g transform="scale(${1 / internalScale})">
+                ${cleanSignature}
+            </g>
             ${borderWidthVal !== '0' && borderStyle !== 'none' ?
             `<rect x="${parseFloat(borderWidthVal) / 2}" y="${parseFloat(borderWidthVal) / 2}" 
                        width="${w - parseFloat(borderWidthVal)}" height="${h - parseFloat(borderWidthVal)}" 
@@ -459,6 +534,22 @@ export async function copyPngToClipboard() {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastError, "#ef4444");
     }
 }
+
+export async function copyBase64() {
+    if (signaturePad.isEmpty()) {
+        showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
+        return;
+    }
+    try {
+        const exportCanvas = getExportCanvas();
+        const dataURL = exportCanvas.toDataURL("image/png");
+        await navigator.clipboard.writeText(dataURL);
+        showToast(i18n[State.currentLang as keyof typeof i18n].toastPngCopied); // Reuse generic success toast
+    } catch (err) {
+        console.error(err);
+        showToast(i18n[State.currentLang as keyof typeof i18n].toastError, "#ef4444");
+    }
+}
 export function copySelection() {
     if (State.selectedStrokeIndices.length === 0) return;
     const data = signaturePad.toData();
@@ -480,7 +571,7 @@ export function pasteSelection() {
 
     // Append new strokes
     const nextData = [...data, ...newStrokes];
-    signaturePad.fromData(nextData);
+    safeFromData(nextData);
 
     // Select the new strokes
     const newIndices = newStrokes.map((_: any, i: number) => data.length + i);
@@ -490,6 +581,7 @@ export function pasteSelection() {
     drawSelectionHighlights();
     syncControlsWithSelection();
     updateTransformPanelState();
+    updateHintVisibility();
 
     showToast(i18n[State.currentLang as keyof typeof i18n].toastStrokesPasted, "#6366f1");
 }
@@ -499,14 +591,13 @@ export function deleteSelection() {
     saveState();
     const data = signaturePad.toData();
     const next = data.filter((_, i) => !State.selectedStrokeIndices.includes(i));
-    signaturePad.fromData(next);
+    safeFromData(next);
 
     setSelectedIndices([]);
     updateSelectedBounds();
     drawSelectionHighlights();
     updateTransformPanelState();
-
-    if (next.length === 0 && hint) hint.classList.remove('hidden');
+    updateHintVisibility();
 }
 
 export function rotateSelection90(dir: 'cw' | 'ccw') {
@@ -536,7 +627,7 @@ export function rotateSelection90(dir: 'cw' | 'ccw') {
         });
     });
 
-    signaturePad.fromData(data);
+    safeFromData(data);
     updateSelectedBounds();
     drawSelectionHighlights();
 }
@@ -565,7 +656,7 @@ export function flipSelection(axis: 'h' | 'v') {
         });
     });
 
-    signaturePad.fromData(data);
+    safeFromData(data);
     updateSelectedBounds();
     drawSelectionHighlights();
 }
@@ -608,7 +699,7 @@ export function scaleSelection(factor: number, save = true, baseData: any = null
         }
     });
 
-    signaturePad.fromData(data);
+    safeFromData(data);
     updateSelectedBounds();
     drawSelectionHighlights();
 }

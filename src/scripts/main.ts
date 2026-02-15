@@ -4,7 +4,7 @@ import {
     setSelecting, setResizing,
     setRotating,
     setSelectedIndices, history, redoStack, currentLang,
-    workspace, hint, selectionInfo, selectionBox,
+    workspace, selectionInfo, selectionBox,
     sidePanel, lastBaseColor, setAlpha,
     container, canvas, selectionCanvas, setWorkspaceScale, customColors,
     favoriteColors, setFavoriteColors
@@ -14,7 +14,7 @@ import {
     applyColor, drawSelectionHighlights, updateStrokeStyles,
     updateStrokePreview, downloadPng, downloadSvg, copyPngToClipboard,
     copySelection, pasteSelection, deleteSelection,
-    rotateSelection90, flipSelection, scaleSelection, showToast
+    rotateSelection90, flipSelection, scaleSelection, showToast, updateHintVisibility, safeFromData, copyBase64
 } from '@/scripts/canvas';
 import {
     updateWorkspaceTransform, syncSizeValues,
@@ -88,6 +88,7 @@ export function initAppLogic() {
         (signaturePad as any)._getPointFromEvent = (signaturePad as any)._createPoint;
     }
     updateTransformPanelState();
+    updateHintVisibility();
 }
 
 function updateHistoryButtons() {
@@ -109,12 +110,12 @@ function setMode(mode: string) {
     if (mode === 'draw') {
         canvas.style.cursor = 'crosshair';
         signaturePad.on();
-        if (hint && signaturePad.isEmpty()) hint.classList.remove('hidden');
+        updateHintVisibility();
         if (selectionCanvas) selectionCanvas.classList.remove('active');
         deselectStroke(false);
     } else {
         signaturePad.off();
-        if (hint) hint.classList.add('hidden');
+        updateHintVisibility();
         if (mode === 'transform' || mode === 'select') {
             canvas.style.cursor = 'default';
             if (selectionCanvas) selectionCanvas.classList.add('active');
@@ -212,7 +213,12 @@ function attachEventListeners() {
     signaturePad.addEventListener("beginStroke", () => {
         if (State.currentMode === 'select' || State.isMoving || State.isResizing || State.isRotating) return;
         saveState();
-        if (hint) hint.classList.add('hidden');
+        updateHintVisibility(true);
+    });
+
+    // Ensure hint is updated after any drawing operation
+    signaturePad.addEventListener("afterUpdate", () => {
+        updateHintVisibility();
     });
 
 
@@ -347,6 +353,7 @@ function attachDynamicListeners() {
         }
 
         if (target.closest('#copyPngBtn')) copyPngToClipboard();
+        if (target.closest('#copyBase64Btn')) copyBase64();
         if (target.closest('#downloadPngBtn')) downloadPng();
         if (target.closest('#downloadSvgBtn')) downloadSvg();
 
@@ -365,7 +372,7 @@ function attachDynamicListeners() {
             if (!signaturePad.isEmpty()) {
                 saveState();
                 signaturePad.clear();
-                if (hint) hint.classList.remove('hidden');
+                updateHintVisibility();
                 deselectStroke(false);
             }
         }
@@ -1263,7 +1270,7 @@ function handlePointerUp(e: PointerEvent) {
                 });
             });
         }
-        signaturePad.fromData(data);
+        safeFromData(data);
         updateSelectedBounds();
         drawSelectionHighlights();
         syncControlsWithSelection();
@@ -1416,6 +1423,7 @@ function selectStrokes(indices: number[], save = true) {
 
     if (selectionInfo) { selectionInfo.innerText = `Trazos Seleccionados: ${indices.length}`; selectionInfo.style.display = indices.length > 0 ? 'block' : 'none'; }
     updateSelectedBounds(); drawSelectionHighlights(); syncControlsWithSelection();
+    updateStrokeStyles();
 }
 
 function deselectStroke(save = true) {

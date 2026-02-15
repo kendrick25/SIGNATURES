@@ -1,5 +1,5 @@
-import { container, workspace, workspacePan, workspaceScale, ratio, signaturePad, canvas, sctx, ctx, selectionCanvas, hint, selectedStrokeIndices } from '@/scripts/state';
-import { drawSelectionHighlights } from '@/scripts/canvas';
+import { container, workspace, workspacePan, workspaceScale, ratio, signaturePad, canvas, sctx, ctx, selectionCanvas, selectedStrokeIndices } from '@/scripts/state';
+import { drawSelectionHighlights, updateHintVisibility, safeFromData } from '@/scripts/canvas';
 
 
 
@@ -33,8 +33,9 @@ export function updateWorkspaceTransform() {
 export function updateSignaturePadOptions() {
     if (!signaturePad) return;
     // Balanced adjustment: enough points for curves, not too many to cause jitter
-    signaturePad.minDistance = 0; // Stroke starts immediately at mouse down
-    signaturePad.throttle = 0; // Absolute 1:1 instantaneous response
+    // A small minDistance (0.5 to 1.0) helps significantly with "pixelation" in curves by filtering sensor noise.
+    signaturePad.minDistance = 0.2;
+    signaturePad.throttle = 0;
 }
 
 export function syncSizeValues() {
@@ -93,11 +94,9 @@ export function resizeCanvas() {
 
         signaturePad.clear();
         if (data.length > 0) {
-            signaturePad.fromData(data);
-            if (hint) hint.classList.add('hidden');
-        } else {
-            if (hint) hint.classList.remove('hidden');
+            safeFromData(data);
         }
+        updateHintVisibility();
         drawSelectionHighlights();
     }
 }
@@ -161,16 +160,14 @@ export function autoAdjustCanvas() {
                 // 3. Move to target center
                 p.x = x + targetCx;
                 p.y = y + targetCy;
-
-                // Scale width
-                p.pressure *= finalScale; // Optional: scale pressure/width too to match?
             });
             data[idx].minWidth *= finalScale;
             data[idx].maxWidth *= finalScale;
         }
     });
 
-    signaturePad.fromData(data);
+    safeFromData(data);
+    updateHintVisibility();
     drawSelectionHighlights();
 
     // Reset workspace pan so the centered content is visible

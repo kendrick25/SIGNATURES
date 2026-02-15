@@ -84,9 +84,10 @@ export function syncControlsWithSelection() {
         dot.classList.toggle('active', dot.getAttribute('data-color')?.toLowerCase() === base.toLowerCase());
     });
 
-    const variety = first.maxWidth / first.minWidth;
+    const variety = first.maxWidth / (first.minWidth || 0.1);
     let detectedType = 'natural';
-    if (variety > 4) detectedType = 'pen';
+    if (variety >= 7) detectedType = 'brush';
+    else if (variety >= 3) detectedType = 'pen';
     else if (variety < 1.1) detectedType = 'marker';
     else detectedType = 'natural';
 

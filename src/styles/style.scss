@@ -15,6 +15,10 @@
     font-family: 'Inter', sans-serif;
 }
 
+.hidden {
+    display: none !important;
+}
+
 body {
     background-color: var(--bg-dark);
     background-image:

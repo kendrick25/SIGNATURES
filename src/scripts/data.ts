@@ -17,6 +17,7 @@ export const i18n: I18nContent = {
         copyPng: "Copiar PNG al Portapapeles",
         downloadPng: "Descargar como PNG",
         downloadSvg: "Descargar como SVG",
+        copyBase64: "Copiar como Base64 (Texto)",
         panelTitle: "PANEL DE CONTROL",
         stroke: "TRAZO",
         natural: "Natural",
@@ -83,6 +84,7 @@ export const i18n: I18nContent = {
         copyPng: "Copy PNG to Clipboard",
         downloadPng: "Download as PNG",
         downloadSvg: "Download as SVG",
+        copyBase64: "Copy as Base64 (Text)",
         panelTitle: "CONTROL PANEL",
         stroke: "STROKE",
         natural: "Natural",
@@ -180,6 +182,7 @@ export const UI_CONFIG: UIConfig = {
     ],
     exportOptions: [
         { id: 'copyPngBtn', icon: 'Copy', i18nKey: 'copyPng' },
+        { id: 'copyBase64Btn', icon: 'Code', i18nKey: 'copyBase64' },
         { id: 'downloadPngBtn', icon: 'Image', i18nKey: 'downloadPng' },
         { id: 'downloadSvgBtn', icon: 'FileCode', i18nKey: 'downloadSvg' }
     ],

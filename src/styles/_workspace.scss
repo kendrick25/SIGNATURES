@@ -338,6 +338,8 @@ canvas#signatureCanvas {
     touch-action: none;
     background: transparent;
     z-index: 1;
+    image-rendering: auto; // Ensures the browser uses high-quality interpolation
+    -webkit-font-smoothing: antialiased;
 }
 
 .selection-canvas-layer {
@@ -419,6 +421,10 @@ canvas#signatureCanvas {
     pointer-events: none;
     z-index: 0;
     opacity: 0.25;
+
+    &.hidden {
+        display: none !important;
+    }
 }
 
 .selection-box {
