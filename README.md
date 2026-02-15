@@ -83,6 +83,30 @@ El código estça organizado modularmente para facilitar su mantenimiento:
     npm run build
     ```
 
+## Contribución (Conventional Commits)
+
+Este proyecto utiliza **Conventional Commits** para mantener un historial de cambios ordenado. Husky y Commitlint verificarán que tus mensajes de commit cumplan con el estándar.
+
+**Formato del comando:**
+```bash
+git commit -m "tipo(alcance opcional): descripción breve"
+```
+
+**Tipos permitidos:**
+*   `feat`: Nueva característica.
+*   `fix`: Corrección de un bug.
+*   `docs`: Cambios en documentación.
+*   `style`: Formato de código scss/ts (no afecta lógica).
+*   `refactor`: Refactorización de código.
+*   `perf`: Mejoras de rendimiento.
+*   `test`: Tests unitarios.
+*   `chore`: Tareas de build, herramientas, dependencias.
+
+**Ejemplo de uso:**
+```bash
+git commit -m "feat(canvas): añadir soporte para sensibilidad de presión"
+```
+
 ## Atajos de Teclado
 
 | Acción | Atajo |

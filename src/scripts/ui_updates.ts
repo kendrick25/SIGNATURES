@@ -1,42 +1,46 @@
-import { selectedStrokeIndices, signaturePad, setThickness, setLastColor, setAlpha, setStrokeType, workspaceScale } from '@/scripts/state';
+import { State, signaturePad, setThickness, setLastColor, setAlpha, setStrokeType } from '@/scripts/state';
 
-export function updateSelectedBounds() {
+export function updateSelectedBounds(customData: any = null) {
     const el = document.getElementById('selectedBounds');
     if (!el) return;
 
-    // Use window.currentMode for consistency with other modules
-    const mode = (window as any).currentMode || 'draw';
+    const mode = State.currentMode;
 
-    if (selectedStrokeIndices.length === 0 || (mode !== 'transform' && mode !== 'select')) {
+    // Show bounding box ONLY in transform mode. In select mode, we only want the stroke highlight (drawing canvas)
+    if (State.selectedStrokeIndices.length === 0 || mode !== 'transform') {
         el.style.display = 'none'; return;
     }
-    const b = getSelectedDataBounds();
+    const b = getSelectedDataBounds(customData);
     if (b.minX === Infinity) { el.style.display = 'none'; return; }
 
     el.style.display = 'block';
-    el.style.left = b.minX + 'px';
-    el.style.top = b.minY + 'px';
-    el.style.width = (b.maxX - b.minX) + 'px';
-    el.style.height = (b.maxY - b.minY) + 'px';
+    el.style.left = (b.minX - 4) + 'px';
+    el.style.top = (b.minY - 4) + 'px';
+    el.style.width = (b.maxX - b.minX + 8) + 'px';
+    el.style.height = (b.maxY - b.minY + 8) + 'px';
 
-    if (mode === 'select') {
-        el.classList.add('no-handles');
-        el.style.border = 'none'; el.style.opacity = '0';
-    } else {
-        el.classList.remove('no-handles');
-        el.style.border = `${1 / workspaceScale}px dashed var(--primary)`; el.style.opacity = '1';
-    }
+    const zoom = State.workspaceScale;
+
+    // Bounding box only exists in transform mode now
+    el.classList.remove('no-handles');
+    el.style.border = `${1.5 / zoom}px dashed var(--primary)`;
+    el.style.opacity = '1';
+    el.style.pointerEvents = 'auto';
+    el.style.background = 'transparent';
 
     const handles = el.querySelectorAll('.resize-handle') as NodeListOf<HTMLElement>;
     handles.forEach(h => {
-        h.style.transform = `scale(${1 / workspaceScale})`;
+        const scaleVal = 1 / zoom;
+        h.style.transform = `translate(-50%, -50%) scale(${scaleVal})`;
+        h.style.pointerEvents = 'auto';
+        h.style.display = 'block';
     });
 }
 
-export function getSelectedDataBounds() {
-    const data = signaturePad.toData();
+export function getSelectedDataBounds(customData: any = null) {
+    const data = customData || signaturePad.toData();
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    selectedStrokeIndices.forEach(idx => {
+    State.selectedStrokeIndices.forEach(idx => {
         if (data[idx]) {
             data[idx].points.forEach((p: any) => {
                 minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
@@ -48,9 +52,9 @@ export function getSelectedDataBounds() {
 }
 
 export function syncControlsWithSelection() {
-    if (selectedStrokeIndices.length === 0) return;
+    if (State.selectedStrokeIndices.length === 0) return;
     const data = signaturePad.toData();
-    const first = data[selectedStrokeIndices[0]];
+    const first = data[State.selectedStrokeIndices[0]];
     if (!first) return;
 
     const currentThicknessVal = (first.maxWidth + first.minWidth) / 2;
@@ -94,4 +98,20 @@ export function syncControlsWithSelection() {
     const thicknessSliderEl = document.getElementById('thicknessSlider') as HTMLInputElement;
     if (thicknessValEl) thicknessValEl.value = currentThicknessVal.toFixed(1);
     if (thicknessSliderEl) thicknessSliderEl.value = currentThicknessVal.toString();
+}
+
+export function updateTransformPanelState() {
+    const hasSelection = State.selectedStrokeIndices.length > 0;
+    const transformPanel = document.getElementById('groupTransform');
+    if (!transformPanel) return;
+
+    // Enable/Disable all interactive elements within the panel (buttons, inputs)
+    const interactives = transformPanel.querySelectorAll('button, input');
+    interactives.forEach(el => {
+        (el as HTMLButtonElement | HTMLInputElement).disabled = !hasSelection;
+    });
+
+    // Add a visual visual hint for the disabled state
+    transformPanel.style.opacity = hasSelection ? '1' : '0.4';
+    transformPanel.style.pointerEvents = hasSelection ? 'auto' : 'none';
 }
