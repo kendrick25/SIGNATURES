@@ -54,9 +54,9 @@ export function initApp() {
         penColor: lastBaseColor,
         minWidth: 0.8,
         maxWidth: 3.8,
-        velocityFilterWeight: 0.5,
-        throttle: 8,
-        minDistance: 0.5
+        velocityFilterWeight: 0.7, // Smoother path interpolation for vector feel
+        throttle: 0,               // Max precision for fast movements
+        minDistance: 0             // No dead-zone for start of strokes
     });
 
     setSignaturePad(pad);

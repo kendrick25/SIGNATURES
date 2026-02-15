@@ -197,20 +197,35 @@ export function drawSelectionHighlights(customData: any = null) {
         if (!stroke || stroke.points.length < 2) return;
 
         sctx.beginPath();
-        sctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-        stroke.points.forEach((p: any, i: number) => {
-            if (i > 0) sctx.lineTo(p.x, p.y);
-        });
+        if (stroke.points.length > 2) {
+            sctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+            for (let i = 1; i < stroke.points.length - 2; i++) {
+                const xc = (stroke.points[i].x + stroke.points[i + 1].x) / 2;
+                const yc = (stroke.points[i].y + stroke.points[i + 1].y) / 2;
+                sctx.quadraticCurveTo(stroke.points[i].x, stroke.points[i].y, xc, yc);
+            }
+            sctx.quadraticCurveTo(
+                stroke.points[stroke.points.length - 2].x,
+                stroke.points[stroke.points.length - 2].y,
+                stroke.points[stroke.points.length - 1].x,
+                stroke.points[stroke.points.length - 1].y
+            );
+        } else {
+            sctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+            sctx.lineTo(stroke.points[1].x, stroke.points[1].y);
+        }
 
-        // 1. Outer Glow/Halo (Dynamic based on zoom to stay visible)
-        const haloWidth = ((stroke.maxWidth + stroke.minWidth) + (14 / zoomScale));
-        sctx.strokeStyle = 'rgba(99, 102, 241, 0.18)';
+        // 1. Outer Glow/Halo (Increased visibility)
+        const haloWidth = stroke.maxWidth + (16 / zoomScale);
+        sctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
         sctx.lineWidth = haloWidth;
+        sctx.lineCap = 'round';
         sctx.stroke();
 
-        // 2. Selection border indicator (professional dash/solid feel)
-        sctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
-        sctx.lineWidth = 1.2 / zoomScale; // Stay thin regardless of zoom
+        // 2. Selection border indicator (High contrast central line)
+        sctx.strokeStyle = 'rgba(99, 102, 241, 0.9)';
+        sctx.lineWidth = 1.5 / zoomScale;
+        sctx.lineCap = 'round';
         sctx.stroke();
     });
 }
@@ -281,77 +296,83 @@ export function showToast(message: string, color = "#10b981") {
 }
 
 function getExportCanvas() {
+    if (!canvas || !container) return canvas || document.createElement('canvas');
+
     const mainCanvas = canvas;
     const exportCanvas = document.createElement("canvas");
-    exportCanvas.width = mainCanvas.width;
-    exportCanvas.height = mainCanvas.height;
+    const baseWidth = container.clientWidth;
+    const baseHeight = container.clientHeight;
+
+    // Adobe-grade quality: Ensure at least 4x super-sampling for export
+    const exportRatio = Math.max(ratio, 4);
+    exportCanvas.width = Math.round(baseWidth * exportRatio);
+    exportCanvas.height = Math.round(baseHeight * exportRatio);
+
     const ectx = exportCanvas.getContext("2d");
     if (!ectx) return mainCanvas;
 
-    const canvasContainer = container;
-    if (!canvasContainer) return mainCanvas;
-    const computedStyle = window.getComputedStyle(canvasContainer);
+    // Enable high-quality smoothing for the export buffer
+    ectx.imageSmoothingEnabled = true;
+    ectx.imageSmoothingQuality = 'high';
+
+    // Use logical coordinates for all drawing operations
+    ectx.save();
+    ectx.scale(exportRatio, exportRatio);
+
+    const radiusRaw = parseFloat((document.getElementById('radiusSlider') as HTMLInputElement)?.value || "0");
+    const radius = currentRadiusUnit === '%' ? (radiusRaw / 100) * Math.min(baseWidth, baseHeight) : radiusRaw;
+
+    const bgColor = container.style.backgroundColor;
+    const isTransparent = !bgColor || bgColor === 'transparent' || bgColor.includes('rgba(0, 0, 0, 0)');
 
     // 1. Prepare Background & Clipping
-    const radiusRaw = parseFloat((document.getElementById('radiusSlider') as HTMLInputElement)?.value || "0");
-    const radius = currentRadiusUnit === '%' ? (radiusRaw / 100) * Math.min(exportCanvas.width, exportCanvas.height) : radiusRaw * ratio;
-
-    const bgColor = canvasContainer.style.backgroundColor;
-    // Only fill if not transparent and EXPLICITLY set by the user (inline style)
-    const isTransparent = !bgColor || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'rgba(255, 255, 255, 0)';
-
-    if (!isTransparent) {
-        ectx.fillStyle = bgColor;
-        if (radius > 0) {
-            ectx.beginPath();
-            ectx.roundRect(0, 0, exportCanvas.width, exportCanvas.height, radius);
-            ectx.fill();
-            ectx.clip();
-        } else {
-            ectx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-        }
-    } else if (radius > 0) {
-        // If transparent but has radius, we still clip for the border/content
+    if (radius > 0) {
         ectx.beginPath();
-        ectx.roundRect(0, 0, exportCanvas.width, exportCanvas.height, radius);
+        ectx.roundRect(0, 0, baseWidth, baseHeight, radius);
+        if (!isTransparent) {
+            ectx.fillStyle = bgColor;
+            ectx.fill();
+        }
         ectx.clip();
+    } else if (!isTransparent) {
+        ectx.fillStyle = bgColor;
+        ectx.fillRect(0, 0, baseWidth, baseHeight);
     }
 
-    // 2. Draw the Signature Pad content
-    ectx.drawImage(mainCanvas, 0, 0);
+    // 2. Draw the Signature content
+    // We draw the main canvas into the logical space. 
+    // Since mainCanvas is already high-res, this is an efficient way to transfer the image data.
+    ectx.drawImage(mainCanvas, 0, 0, baseWidth, baseHeight);
 
-    // 3. Draw Border if any
+    // 3. Draw Border
     const borderSlider = document.getElementById('borderWidthSlider') as HTMLInputElement;
-    const widthVal = parseFloat(borderSlider?.value || "0");
-    const width = widthVal * ratio;
+    const borderWidth = parseFloat(borderSlider?.value || "0");
     const style = currentCanvasBorderStyle;
-    const color = canvasContainer.style.borderColor || computedStyle.borderColor || "rgba(255, 255, 255, 0.08)";
 
-    // We only handle basic solid borders for PNG export easily. 
-    // Complex SVG-based borders are harder to replicate exactly on canvas,
-    // but we can try a simplified version.
-    if (width > 0 && style !== 'none') {
-        ectx.strokeStyle = color;
-        ectx.lineWidth = width * ratio; // Adjust for device pixel ratio
-        const dashVal = parseInt((document.getElementById('borderDashSlider') as HTMLInputElement)?.value || '4') * ratio;
+    if (borderWidth > 0 && style !== 'none') {
+        const computedStyle = window.getComputedStyle(container);
+        ectx.strokeStyle = container.style.borderColor || computedStyle.borderColor || "rgba(255, 255, 255, 0.08)";
+        ectx.lineWidth = borderWidth;
+
+        const dashVal = parseInt((document.getElementById('borderDashSlider') as HTMLInputElement)?.value || '4');
 
         if (style === 'dashed') ectx.setLineDash([dashVal, dashVal]);
         else if (style === 'dotted') ectx.setLineDash([1, dashVal]);
         else ectx.setLineDash([]);
 
-        const inset = width / 2;
-        // Adjust radius for the border to keep it aligned with the background clipping
+        const inset = borderWidth / 2;
         const borderRadius = Math.max(0, radius - inset);
 
         if (radius > 0) {
             ectx.beginPath();
-            ectx.roundRect(inset, inset, exportCanvas.width - width, exportCanvas.height - width, borderRadius);
+            ectx.roundRect(inset, inset, baseWidth - borderWidth, baseHeight - borderWidth, borderRadius);
             ectx.stroke();
         } else {
-            ectx.strokeRect(inset, inset, exportCanvas.width - width, exportCanvas.height - width);
+            ectx.strokeRect(inset, inset, baseWidth - borderWidth, baseHeight - borderWidth);
         }
     }
 
+    ectx.restore();
     return exportCanvas;
 }
 

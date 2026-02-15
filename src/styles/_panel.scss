@@ -524,11 +524,12 @@ input:checked+.slider:before {
 .thickness-control {
     display: flex;
     align-items: center;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--glass-border);
-    border-radius: 12px;
+    border-radius: 8px;
     overflow: hidden;
     width: 100%;
+    height: 28px;
 }
 
 .thickness-input {
@@ -536,9 +537,9 @@ input:checked+.slider:before {
     border: none;
     color: var(--text-main);
     font-weight: 600;
-    width: 32px;
+    width: 28px;
     text-align: center;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     outline: none;
     appearance: textfield;
     -webkit-appearance: textfield;
@@ -555,8 +556,9 @@ input:checked+.slider:before {
 
 
 .scrub-btn {
-    padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.03);
+    padding: 0 10px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.02);
     border: none;
     color: var(--text-dim);
     display: flex;
@@ -566,13 +568,13 @@ input:checked+.slider:before {
     transition: all 0.2s;
 
     &:hover {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.08);
         color: white;
     }
 
     i {
-        width: 14px;
-        height: 14px;
+        width: 12px;
+        height: 12px;
     }
 }
 
@@ -583,6 +585,13 @@ input:checked+.slider:before {
     flex-grow: 1;
     cursor: ew-resize;
     height: 100%;
+
+    .zoom-unit {
+        font-size: 0.65rem;
+        color: var(--text-dim);
+        margin-left: 1px;
+        font-weight: 600;
+    }
 }
 
 .transform-controls-grid {

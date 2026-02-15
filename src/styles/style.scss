@@ -81,16 +81,30 @@ body {
         font-weight: 600;
         color: var(--text-dim);
 
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .icon-btn,
         .close-btn {
             background: transparent;
             border: none;
             color: var(--text-dim);
             cursor: pointer;
-            padding: 4px;
+            padding: 6px;
             display: flex;
+            border-radius: 6px;
+            transition: all 0.2s;
 
             &:hover {
                 color: white;
+                background: rgba(255, 255, 255, 0.1);
+            }
+
+            &#addFavoriteBtn:hover {
+                color: #fbbf24; // Amber color for star
             }
 
             svg {
@@ -147,12 +161,104 @@ body {
 
             &::-webkit-slider-thumb {
                 -webkit-appearance: none;
+                appearance: none;
                 width: 14px;
                 height: 14px;
                 background: white;
                 border-radius: 50%;
                 cursor: pointer;
                 box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+            }
+        }
+    }
+
+    .favorites-section {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+        .section-label {
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .favorites-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            min-height: 24px;
+        }
+
+        .fav-item {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+
+            .fav-dot {
+                width: 22px;
+                height: 22px;
+                border-radius: 50%;
+                cursor: pointer;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                transition: transform 0.2s, box-shadow 0.2s;
+
+                &:hover {
+                    transform: scale(1.1);
+                    box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+                }
+            }
+
+            .fav-controls {
+                position: absolute;
+                bottom: -20px;
+                left: 50%;
+                transform: translateX(-50%);
+                display: flex;
+                gap: 2px;
+                background: rgba(0, 0, 0, 0.8);
+                padding: 2px;
+                border-radius: 4px;
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.2s;
+                z-index: 10;
+                border: 1px solid var(--glass-border);
+            }
+
+            &:hover .fav-controls {
+                opacity: 1;
+                visibility: visible;
+                bottom: -22px;
+            }
+
+            .fav-action {
+                background: transparent;
+                border: none;
+                color: white;
+                cursor: pointer;
+                padding: 2px;
+                display: flex;
+                border-radius: 2px;
+
+                &:hover {
+                    background: rgba(255, 255, 255, 0.2);
+                    color: var(--primary);
+                }
+
+                &.remove-fav:hover {
+                    color: #ef4444; // Red
+                }
+
+                svg {
+                    width: 10px;
+                    height: 10px;
+                }
             }
         }
     }
@@ -171,17 +277,82 @@ body {
             span {
                 font-size: 0.6rem;
                 color: var(--text-dim);
+                font-weight: 700;
             }
 
-            input {
+            .custom-number-input {
+                position: relative;
                 width: 100%;
+                display: flex;
+                align-items: center;
                 background: rgba(0, 0, 0, 0.2);
+                border-radius: 6px;
                 border: 1px solid var(--glass-border);
-                color: white;
-                font-size: 0.7rem;
-                padding: 4px;
-                border-radius: 4px;
-                text-align: center;
+                overflow: hidden;
+                transition: border-color 0.2s, box-shadow 0.2s;
+
+                &:focus-within {
+                    border-color: var(--primary);
+                    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+                }
+
+                input {
+                    width: 100%;
+                    background: transparent;
+                    border: none;
+                    outline: none;
+                    color: white;
+                    font-size: 0.8rem;
+                    padding: 6px 24px 6px 8px;
+                    text-align: center;
+                    font-family: 'Outfit', sans-serif;
+                    font-weight: 600;
+
+                    // Remove default arrows
+                    &::-webkit-inner-spin-button,
+                    &::-webkit-outer-spin-button {
+                        -webkit-appearance: none;
+                        appearance: none;
+                        margin: 0;
+                    }
+
+                    -moz-appearance: textfield;
+                    appearance: none;
+                }
+
+                .input-arrows {
+                    position: absolute;
+                    right: 4px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1px;
+
+                    button {
+                        background: transparent;
+                        border: none;
+                        color: var(--text-dim);
+                        padding: 0;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        height: 10px;
+                        transition: color 0.1s;
+
+                        &:hover {
+                            color: white;
+                        }
+
+                        &:active {
+                            transform: scale(0.9);
+                        }
+
+                        svg {
+                            width: 10px;
+                            height: 10px;
+                        }
+                    }
+                }
             }
         }
     }
@@ -205,6 +376,14 @@ body {
             padding: 4px 8px;
             border-radius: 4px;
             font-family: monospace;
+        }
+
+        #currentColorPreview {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            flex-shrink: 0;
         }
     }
 
@@ -243,7 +422,7 @@ button {
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
-    border-radius: 10px;
+
     font-weight: 600;
     font-size: 0.75rem;
     cursor: pointer;

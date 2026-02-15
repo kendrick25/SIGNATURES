@@ -41,6 +41,9 @@ export let customColors: Record<string, string> = {
     canvasBorderColorPicker: ''
 };
 
+const savedFavorites = localStorage.getItem('favoriteColors');
+export let favoriteColors: string[] = savedFavorites ? JSON.parse(savedFavorites) : ['#ffffff', '#6366f1', '#06b6d4', '#000000'];
+
 export let isSelecting = false;
 export let isMoving = false;
 export let isResizing = false;
@@ -49,7 +52,8 @@ export let isPanning = false;
 
 export let workspacePan = { x: 0, y: 0 };
 export let workspaceScale = 1.0;
-export let ratio = Math.max(window.devicePixelRatio || 1, 1);
+// Vector-Quality: We boost the internal resolution beyond the standard DPR to ensure crispness even when zoomed.
+export let ratio = Math.max(window.devicePixelRatio || 1, 2) * 2;
 
 // State Mutators (since we can't change exported 'let' from other modules in ESM directly without functions)
 // Global State Object for true live bindings across modules
@@ -68,7 +72,8 @@ export const State = {
     get workspaceScale() { return workspaceScale; },
     get selectedStrokeIndices() { return selectedStrokeIndices; },
     get currentLang() { return currentLang; },
-    get clipboardStrokes() { return clipboardStrokes; }
+    get clipboardStrokes() { return clipboardStrokes; },
+    get favoriteColors() { return favoriteColors; }
 };
 
 export const setThickness = (val: number) => { currentThickness = val; };
@@ -87,6 +92,11 @@ export const setMoving = (val: boolean) => { isMoving = val; };
 export const setResizing = (val: boolean) => { isResizing = val; };
 export const setRotating = (val: boolean) => { isRotating = val; };
 export const setPanning = (val: boolean) => { isPanning = val; };
+
+export const setFavoriteColors = (val: string[]) => {
+    favoriteColors = val;
+    localStorage.setItem('favoriteColors', JSON.stringify(val));
+};
 
 
 // Export instances that will be initialized in initApp

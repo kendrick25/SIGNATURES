@@ -1,4 +1,4 @@
-import { container, workspace, workspacePan, workspaceScale, signaturePad, canvas, sctx, ctx, selectionCanvas, hint, selectedStrokeIndices } from '@/scripts/state';
+import { container, workspace, workspacePan, workspaceScale, ratio, signaturePad, canvas, sctx, ctx, selectionCanvas, hint, selectedStrokeIndices } from '@/scripts/state';
 import { drawSelectionHighlights } from '@/scripts/canvas';
 
 
@@ -55,36 +55,40 @@ export function resizeCanvas() {
     // Store data to restore after resize
     const data = signaturePad.toData();
 
-    // Use current devicePixelRatio to handle browser zoom levels dynamically
-    const currentRatio = Math.max(window.devicePixelRatio || 1, 1);
-    const effectiveScale = currentRatio;
+    // Unified High-Quality Ratio (Super-Sampling)
+    const effectiveScale = ratio;
 
-    // Use clientWidth to avoid border-induced growth loops
-    const baseWidth = Math.floor(container.clientWidth);
-    const baseHeight = Math.floor(container.clientHeight);
+    const baseWidth = container.clientWidth;
+    const baseHeight = container.clientHeight;
 
-    const newWidth = Math.floor(baseWidth * effectiveScale);
-    const newHeight = Math.floor(baseHeight * effectiveScale);
+    // Use Math.round to ensure exact physical pixel mapping
+    const newWidth = Math.round(baseWidth * effectiveScale);
+    const newHeight = Math.round(baseHeight * effectiveScale);
 
     if (canvas.width !== newWidth || canvas.height !== newHeight) {
-        // Essential: Set internal resolution
         canvas.width = newWidth;
         canvas.height = newHeight;
-
-        // Essential: Set CSS size to match container's LOGICAL size
         canvas.style.width = baseWidth + 'px';
         canvas.style.height = baseHeight + 'px';
+        canvas.style.transform = 'translateZ(0)'; // Force GPU layer
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(effectiveScale, effectiveScale);
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
 
         if (selectionCanvas && sctx) {
             selectionCanvas.width = newWidth;
             selectionCanvas.height = newHeight;
             selectionCanvas.style.width = baseWidth + 'px';
             selectionCanvas.style.height = baseHeight + 'px';
+            selectionCanvas.style.transform = 'translateZ(0)';
+
             sctx.setTransform(1, 0, 0, 1, 0, 0);
             sctx.scale(effectiveScale, effectiveScale);
+            sctx.imageSmoothingEnabled = true;
+            sctx.imageSmoothingQuality = 'high';
         }
 
         signaturePad.clear();

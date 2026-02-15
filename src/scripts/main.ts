@@ -6,27 +6,28 @@ import {
     setSelectedIndices, history, redoStack, currentLang,
     workspace, hint, selectionInfo, selectionBox,
     sidePanel, lastBaseColor, setAlpha,
-    container, canvas, selectionCanvas, setWorkspaceScale, customColors
+    container, canvas, selectionCanvas, setWorkspaceScale, customColors,
+    favoriteColors, setFavoriteColors
 } from '@/scripts/state';
 import {
     saveState, undo, redo, updateThickness, applyStrokeType,
     applyColor, drawSelectionHighlights, updateStrokeStyles,
     updateStrokePreview, downloadPng, downloadSvg, copyPngToClipboard,
     copySelection, pasteSelection, deleteSelection,
-    rotateSelection90, flipSelection, scaleSelection
+    rotateSelection90, flipSelection, scaleSelection, showToast
 } from '@/scripts/canvas';
 import {
     updateWorkspaceTransform, syncSizeValues,
     recenterCanvas, resizeCanvas, autoAdjustCanvas
 } from '@/scripts/workspace';
-import { renderUIComponents, updateGlobalReferences, createIcons, updateLanguage } from '@/scripts/data';
+import { renderUIComponents, updateGlobalReferences, createIcons, updateLanguage, i18n } from '@/scripts/data';
 import { updateSelectedBounds, getSelectedDataBounds, syncControlsWithSelection, updateTransformPanelState } from '@/scripts/ui_updates';
 
 
 
 // --- Initialization ---
 
-export let currentCanvasBorderStyle = 'solid';
+export let currentCanvasBorderStyle = 'none';
 export let currentRadiusUnit = 'px';
 let bgOpacity = 1.0;
 let borderOpacity = 1.0;
@@ -40,6 +41,7 @@ export function initAppLogic() {
     updateStrokeStyles();
     updateStrokePreview();
     updateHistoryButtons();
+    updateCanvasBorder();
 
     (window as any).currentMode = 'draw';
     setMode('draw');
@@ -412,7 +414,7 @@ function attachControlListeners() {
     });
 
     const updateCanvasW = (w: any) => {
-        const val = Math.max(200, Math.min(2000, parseInt(w)));
+        const val = Math.max(20, Math.min(2000, parseInt(w)));
         if (container) container.style.width = val + 'px';
         const wVal = document.getElementById('canvasWidthVal') as HTMLInputElement;
         const wSlider = document.getElementById('widthSlider') as HTMLInputElement;
@@ -421,7 +423,7 @@ function attachControlListeners() {
         syncSizeValues(); resizeCanvas();
     };
     const updateCanvasH = (h: any) => {
-        const val = Math.max(100, Math.min(1000, parseInt(h)));
+        const val = Math.max(20, Math.min(1000, parseInt(h)));
         if (container) container.style.height = val + 'px';
         const hVal = document.getElementById('canvasHeightVal') as HTMLInputElement;
         const hSlider = document.getElementById('heightSlider') as HTMLInputElement;
@@ -617,8 +619,22 @@ function updateCanvasBorder() {
     const radius = (document.getElementById('radiusSlider') as HTMLInputElement)?.value || '0';
     const dashVal = (document.getElementById('borderDashSlider') as HTMLInputElement)?.value || '4';
 
-    const slider = document.getElementById('borderDashSlider') as HTMLInputElement;
-    if (slider) slider.disabled = (style === 'solid' || style === 'none');
+    const isNone = style === 'none';
+    const dashSlider = document.getElementById('borderDashSlider') as HTMLInputElement;
+    if (dashSlider) dashSlider.disabled = (style === 'solid' || isNone);
+
+    const widthSlider = document.getElementById('borderWidthSlider') as HTMLInputElement;
+    const radiusSlider = document.getElementById('radiusSlider') as HTMLInputElement;
+    const borderOpacitySlider = document.getElementById('borderOpacitySlider') as HTMLInputElement;
+    const borderColorPicker = document.getElementById('canvasBorderColorPicker') as HTMLElement;
+
+    if (widthSlider) widthSlider.disabled = isNone;
+    if (radiusSlider) radiusSlider.disabled = isNone;
+    if (borderOpacitySlider) borderOpacitySlider.disabled = isNone;
+    if (borderColorPicker) {
+        borderColorPicker.style.pointerEvents = isNone ? 'none' : 'auto';
+        borderColorPicker.style.opacity = isNone ? '0.5' : '1';
+    }
 
     const radiusWithUnit = radius + currentRadiusUnit;
 
@@ -657,6 +673,7 @@ function updateCanvasBorder() {
 
 // --- Advanced Color Picker Logic ---
 
+let refreshAdvancedPicker: (() => void) | null = null;
 function initAdvancedPicker() {
     const picker = document.getElementById('advancedColorPicker');
     const header = picker?.querySelector('.window-header');
@@ -665,6 +682,8 @@ function initAdvancedPicker() {
     if (header && picker) {
         let isDragging = false, startX = 0, startY = 0, initialX = 0, initialY = 0;
         header.addEventListener('pointerdown', (e: any) => {
+            // Don't drag if clicking buttons
+            if (e.target.closest('button')) return;
             isDragging = true;
             startX = e.clientX; startY = e.clientY;
             const rect = picker.getBoundingClientRect();
@@ -682,7 +701,25 @@ function initAdvancedPicker() {
         window.addEventListener('pointerup', () => isDragging = false);
     }
 
-    closeBtn?.addEventListener('click', () => picker?.classList.add('hidden'));
+    closeBtn?.addEventListener('click', () => {
+        picker?.classList.add('hidden');
+    });
+
+    const addFavBtn = document.getElementById('addFavoriteBtn');
+    addFavBtn?.addEventListener('click', () => {
+        const color = hexInput.value.toUpperCase();
+        if (!favoriteColors.includes(color)) {
+            if (favoriteColors.length >= 4) {
+                showToast(i18n[currentLang as keyof typeof i18n].toastMaxFavorites, "#f59e0b");
+                return;
+            }
+            setFavoriteColors([...favoriteColors, color]);
+            renderAdvancedFavorites();
+            renderUIComponents();
+            updateGlobalReferences();
+            createIcons();
+        }
+    });
 
     const canvas = document.getElementById('colorCanvas') as HTMLCanvasElement;
     const hueSlider = document.getElementById('hueSlider') as HTMLInputElement;
@@ -723,13 +760,26 @@ function initAdvancedPicker() {
         updateFromHSB();
     });
 
-    [rInput, gInput, bInput].forEach(inp => inp.addEventListener('change', () => {
-        const r = parseInt(rInput.value), g = parseInt(gInput.value), b = parseInt(bInput.value);
-        const hsb = rgbToHsb(r, g, b);
-        currentPickerColor = hsb;
-        hueSlider.value = hsb.h.toString();
-        updateFromHSB();
-    }));
+    [rInput, gInput, bInput].forEach(inp => {
+        inp.addEventListener('change', () => {
+            const r = parseInt(rInput.value), g = parseInt(gInput.value), b = parseInt(bInput.value);
+            const hsb = rgbToHsb(r, g, b);
+            currentPickerColor = hsb;
+            hueSlider.value = hsb.h.toString();
+            updateFromHSB();
+        });
+
+        // Custom arrows logic
+        const arrows = inp.parentElement!.querySelector('.input-arrows');
+        arrows?.querySelector('.arrow-up')?.addEventListener('click', () => {
+            inp.value = Math.min(255, parseInt(inp.value || '0') + 1).toString();
+            inp.dispatchEvent(new Event('change'));
+        });
+        arrows?.querySelector('.arrow-down')?.addEventListener('click', () => {
+            inp.value = Math.max(0, parseInt(inp.value || '0') - 1).toString();
+            inp.dispatchEvent(new Event('change'));
+        });
+    });
 
     hexInput?.addEventListener('change', () => {
         const rgb = hexToRgb(hexInput.value);
@@ -747,7 +797,83 @@ function initAdvancedPicker() {
         picker?.classList.add('hidden');
     });
 
+    refreshAdvancedPicker = updateFromHSB;
     renderColorCanvas();
+    renderAdvancedFavorites();
+}
+
+function renderAdvancedFavorites() {
+    const container = document.getElementById('advancedFavorites');
+    if (!container) return;
+
+    container.innerHTML = favoriteColors.map((color, index) => `
+        <div class="fav-item" data-index="${index}">
+            <div class="fav-dot" style="background: ${color};" data-color="${color}"></div>
+            <div class="fav-controls">
+                <button class="fav-action move-left" title="Mover izquierda">
+                    <i data-lucide="chevron-left"></i>
+                </button>
+                <button class="fav-action remove-fav" title="Eliminar">
+                    <i data-lucide="x"></i>
+                </button>
+                <button class="fav-action move-right" title="Mover derecha">
+                    <i data-lucide="chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    createIcons();
+
+    container.querySelectorAll('.fav-dot').forEach(dot => {
+        dot.addEventListener('click', (e: any) => {
+            const color = e.target.dataset.color;
+            const rgb = hexToRgb(color);
+            if (rgb) {
+                currentPickerColor = rgbToHsb(rgb.r, rgb.g, rgb.b);
+                const hueSlider = document.getElementById('hueSlider') as HTMLInputElement;
+                hueSlider.value = currentPickerColor.h.toString();
+
+                // Trigger update
+                const rInput = document.getElementById('rInput') as HTMLInputElement;
+                const gInput = document.getElementById('gInput') as HTMLInputElement;
+                const bInput = document.getElementById('bInput') as HTMLInputElement;
+                const hexInput = document.getElementById('hexInput') as HTMLInputElement;
+
+                const rgbVal = hsbToRgb(currentPickerColor.h, currentPickerColor.s, currentPickerColor.v);
+                rInput.value = rgbVal.r.toString();
+                gInput.value = rgbVal.g.toString();
+                bInput.value = rgbVal.b.toString();
+                hexInput.value = color.toUpperCase();
+                document.getElementById('currentColorPreview')!.style.backgroundColor = color;
+
+                renderColorCanvas();
+                updateCursorPosition();
+            }
+        });
+    });
+
+    container.querySelectorAll('.fav-action').forEach(btn => {
+        btn.addEventListener('click', (e: any) => {
+            e.stopPropagation();
+            const item = btn.closest('.fav-item') as HTMLElement;
+            const index = parseInt(item.dataset.index!);
+            let newFavs = [...favoriteColors];
+
+            if (btn.classList.contains('remove-fav')) {
+                newFavs.splice(index, 1);
+            } else if (btn.classList.contains('move-left') && index > 0) {
+                [newFavs[index - 1], newFavs[index]] = [newFavs[index], newFavs[index - 1]];
+            } else if (btn.classList.contains('move-right') && index < newFavs.length - 1) {
+                [newFavs[index + 1], newFavs[index]] = [newFavs[index], newFavs[index + 1]];
+            }
+
+            setFavoriteColors(newFavs);
+            renderAdvancedFavorites();
+            renderUIComponents();
+            updateGlobalReferences();
+        });
+    });
 }
 
 function renderColorCanvas() {
@@ -781,6 +907,24 @@ function updateCursorPosition() {
 }
 
 function openAdvancedPicker() {
+    if (!activePickerId) return;
+
+    // Get current color from custom or default
+    let color = customColors[activePickerId];
+    if (!color) {
+        if (activePickerId === 'colorPicker') color = '#ffffff';
+        else if (activePickerId === 'canvasBgPicker') color = '#0f172a';
+        else color = '#ffffff';
+    }
+
+    const rgb = hexToRgb(color);
+    if (rgb) {
+        currentPickerColor = rgbToHsb(rgb.r, rgb.g, rgb.b);
+        const hueSlider = document.getElementById('hueSlider') as HTMLInputElement;
+        if (hueSlider) hueSlider.value = currentPickerColor.h.toString();
+        if (refreshAdvancedPicker) refreshAdvancedPicker();
+    }
+
     document.getElementById('advancedColorPicker')?.classList.remove('hidden');
     updateCursorPosition();
 }
@@ -816,6 +960,11 @@ function applySelectedColor(color: string) {
             updateCanvasBorder();
         }
     }
+
+    // Re-render UI to update dots if color was custom
+    renderUIComponents();
+    updateGlobalReferences();
+    createIcons();
 }
 
 // Math helpers
@@ -934,8 +1083,6 @@ function handlePointerDown(e: PointerEvent) {
     }
 
     const { x: cx, y: cy } = getCanvasCoordinates(e);
-    const rect = canvas.getBoundingClientRect();
-    const isInsideCanvas = (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom);
     const handleEl = (e.target as HTMLElement).closest('.resize-handle') as HTMLElement;
 
     if (handleEl && (State.currentMode === 'select' || State.currentMode === 'transform')) {
@@ -951,7 +1098,13 @@ function handlePointerDown(e: PointerEvent) {
         (e.target as HTMLElement).setPointerCapture(e.pointerId); return;
     }
 
-    if (!isInsideCanvas) return;
+    function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
+        const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+        if (l2 === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+        let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.sqrt((px - (x1 + t * (x2 - x1))) ** 2 + (py - (y1 + t * (y2 - y1))) ** 2);
+    }
 
     if (State.currentMode === 'select' || State.currentMode === 'transform') {
         const bounds = getSelectedDataBounds();
@@ -960,30 +1113,36 @@ function handlePointerDown(e: PointerEvent) {
         let clickedStrokeIdx = -1;
         const rect = canvas.getBoundingClientRect();
         const actualScaleX = rect.width / canvas.offsetWidth || 1;
-        const hitSlop = 10 / actualScaleX;
 
         for (let i = data.length - 1; i >= 0; i--) {
             const stroke = data[i];
-            const radius = ((stroke.maxWidth + stroke.minWidth) / 2) + hitSlop;
+            const baseSlop = 15 / actualScaleX;
+            const radius = ((stroke.maxWidth + stroke.minWidth) / 2) + baseSlop;
+            const tolerance = 12 / State.workspaceScale;
+            const threshold = radius + tolerance;
 
-            // Optimization: Bounding Box Check first
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
             for (const p of stroke.points) {
-                if (p.x < minX) minX = p.x;
-                if (p.x > maxX) maxX = p.x;
-                if (p.y < minY) minY = p.y;
-                if (p.y > maxY) maxY = p.y;
+                if (p.x < sMinX) sMinX = p.x; if (p.x > sMaxX) sMaxX = p.x;
+                if (p.y < sMinY) sMinY = p.y; if (p.y > sMaxY) sMaxY = p.y;
             }
+            if (cx < sMinX - threshold || cx > sMaxX + threshold || cy < sMinY - threshold || cy > sMaxY + threshold) continue;
 
-            // Expand by radius
-            minX -= radius; maxX += radius; minY -= radius; maxY += radius;
+            // Detailed Check: Distance to each segment
+            for (let j = 0; j < stroke.points.length - 1; j++) {
+                const p1 = stroke.points[j], p2 = stroke.points[j + 1];
+                if (distToSegment(cx, cy, p1.x, p1.y, p2.x, p2.y) < threshold) {
+                    clickedStrokeIdx = i; break;
+                }
+            }
+            if (clickedStrokeIdx !== -1) break;
 
-            if (cx < minX || cx > maxX || cy < minY || cy > maxY) continue;
-
-            // Detailed Check
-            if (stroke.points.some((p: any) => Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2) < radius)) {
-                clickedStrokeIdx = i;
-                break;
+            // Single point stroke check
+            if (stroke.points.length === 1) {
+                const p = stroke.points[0];
+                if (Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2) < threshold) {
+                    clickedStrokeIdx = i; break;
+                }
             }
         }
 
@@ -1000,10 +1159,14 @@ function handlePointerDown(e: PointerEvent) {
         } else {
             if (State.currentMode === 'select') {
                 setSelecting(true); selectStart.x = cx; selectStart.y = cy;
-                if (selectionBox) { selectionBox.style.display = 'block'; selectionBox.style.width = '0'; selectionBox.style.height = '0'; }
-            } else if (State.currentMode === 'transform' && !clickedInsideSelection) deselectStroke();
+                // If it's a fixed click on background, findStrokesInArea will handle deselection on Up
+            } else if (State.currentMode === 'transform' && !clickedInsideSelection) {
+                deselectStroke();
+            }
         }
-    } else if (State.currentMode === 'pan') { setPanning(true); panStart = { x: e.clientX, y: e.clientY }; }
+    } else if (State.currentMode === 'pan') {
+        setPanning(true); panStart = { x: e.clientX, y: e.clientY };
+    }
 }
 
 function handlePointerMove(e: PointerEvent) {
@@ -1014,8 +1177,12 @@ function handlePointerMove(e: PointerEvent) {
     }
     const { x: cx, y: cy } = getCanvasCoordinates(e);
     if (State.isSelecting && selectionBox) {
-        const x = Math.min(cx, selectStart.x), y = Math.min(cy, selectStart.y), w = Math.abs(cx - selectStart.x), h = Math.abs(cy - selectStart.y);
-        selectionBox.style.left = x + 'px'; selectionBox.style.top = y + 'px'; selectionBox.style.width = w + 'px'; selectionBox.style.height = h + 'px';
+        const dx = Math.abs(cx - selectStart.x), dy = Math.abs(cy - selectStart.y);
+        if (dx > 3 || dy > 3) {
+            const x = Math.min(cx, selectStart.x), y = Math.min(cy, selectStart.y), w = Math.abs(cx - selectStart.x), h = Math.abs(cy - selectStart.y);
+            selectionBox.style.display = 'block';
+            selectionBox.style.left = x + 'px'; selectionBox.style.top = y + 'px'; selectionBox.style.width = w + 'px'; selectionBox.style.height = h + 'px';
+        }
     } else if (State.isMoving) {
         const dx = cx - moveStart.x, dy = cy - moveStart.y;
         if (dx !== 0 || dy !== 0) {
@@ -1057,9 +1224,15 @@ function handlePointerMove(e: PointerEvent) {
 function handlePointerUp(e: PointerEvent) {
     if (State.isPanning && modeBeforeMiddleClick) { setMode(modeBeforeMiddleClick); modeBeforeMiddleClick = null; }
     if (State.isSelecting) {
-        setSelecting(false); if (selectionBox) selectionBox.style.display = 'none';
+        setSelecting(false);
+        if (selectionBox) {
+            selectionBox.style.display = 'none';
+            selectionBox.style.width = '0';
+            selectionBox.style.height = '0';
+        }
         const { x: cx, y: cy } = getCanvasCoordinates(e);
         findStrokesInArea(selectStart.x, selectStart.y, cx, cy, e.shiftKey, e.ctrlKey);
+        selectStart = { x: 0, y: 0 };
     }
 
     if (State.isMoving || State.isResizing || State.isRotating) {
@@ -1178,25 +1351,38 @@ function findStrokesInArea(x1: number, y1: number, x2: number, y2: number, shift
     const actualScaleX = rect.width / (canvas.offsetWidth || 1);
     const isClick = (Math.abs(x2 - x1) * actualScaleX) < 5 && (Math.abs(y2 - y1) * actualScaleX) < 5;
     const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
+    function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
+        const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+        if (l2 === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+        let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.sqrt((px - (x1 + t * (x2 - x1))) ** 2 + (py - (y1 + t * (y2 - y1))) ** 2);
+    }
+
     data.forEach((stroke, idx) => {
         let match = false;
-        const hitSlop = 5 / actualScaleX;
+        const hitSlop = 15 / actualScaleX;
         const radius = ((stroke.maxWidth + stroke.minWidth) / 2) + hitSlop;
+        const tolerance = 12 / State.workspaceScale;
+        const threshold = radius + tolerance;
 
-        // Fast Bounding Box Check
         let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
         for (const p of stroke.points) {
-            if (p.x < sMinX) sMinX = p.x;
-            if (p.x > sMaxX) sMaxX = p.x;
-            if (p.y < sMinY) sMinY = p.y;
-            if (p.y > sMaxY) sMaxY = p.y;
+            if (p.x < sMinX) sMinX = p.x; if (p.x > sMaxX) sMaxX = p.x;
+            if (p.y < sMinY) sMinY = p.y; if (p.y > sMaxY) sMaxY = p.y;
         }
-        sMinX -= radius; sMaxX += radius; sMinY -= radius; sMaxY += radius;
 
         if (isClick) {
-            // Click selection
-            if (midX >= sMinX && midX <= sMaxX && midY >= sMinY && midY <= sMaxY) {
-                if (stroke.points.some((p: any) => Math.sqrt((p.x - midX) ** 2 + (p.y - midY) ** 2) < radius + (10 / State.workspaceScale))) match = true;
+            if (midX >= sMinX - threshold && midX <= sMaxX + threshold && midY >= sMinY - threshold && midY <= sMaxY + threshold) {
+                for (let j = 0; j < stroke.points.length - 1; j++) {
+                    if (distToSegment(midX, midY, stroke.points[j].x, stroke.points[j].y, stroke.points[j + 1].x, stroke.points[j + 1].y) < threshold) {
+                        match = true; break;
+                    }
+                }
+                if (!match && stroke.points.length === 1) {
+                    const p = stroke.points[0];
+                    if (Math.sqrt((p.x - midX) ** 2 + (p.y - midY) ** 2) < threshold) match = true;
+                }
             }
         } else {
             // Drag Selection (Marquee)

@@ -1,5 +1,5 @@
 import { createIcons as lucideCreateIcons, icons } from 'lucide';
-import { currentLang, UIConfig, I18nContent, setDynamicRefs, customColors } from '@/scripts/state';
+import { currentLang, UIConfig, I18nContent, setDynamicRefs, customColors, favoriteColors, State } from '@/scripts/state';
 
 // ... (skipping i18n and UI_CONFIG constant definitions which are huge)
 
@@ -68,7 +68,8 @@ export const i18n: I18nContent = {
         solid: "Sólido",
         dashed: "Guiones",
         dotted: "Puntos",
-        borderSpacing: "ESPACIADO DE BORDE"
+        borderSpacing: "ESPACIADO DE BORDE",
+        toastMaxFavorites: "Máximo 4 favoritos permitidos"
     },
     en: {
         drawMode: "Drawing Mode (P)",
@@ -133,7 +134,8 @@ export const i18n: I18nContent = {
         solid: "Solid",
         dashed: "Dashed",
         dotted: "Dotted",
-        borderSpacing: "BORDER SPACING"
+        borderSpacing: "BORDER SPACING",
+        toastMaxFavorites: "Maximum 4 favorites allowed"
     }
 };
 
@@ -278,27 +280,26 @@ function renderColorPicker(containerId: string) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const isBackground = containerId === 'canvasBgPicker';
-    const isBorder = containerId === 'canvasBorderColorPicker';
+    const transparentDot = `
+        <div class="color-dot ${(!customColors[containerId] && State.favoriteColors.length === 0) ? 'active' : ''}" 
+             style="background: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 8px 8px; background-position: 0 0, 0 4px, 4px 4px, 4px 0; background-color: #fff;" 
+             data-color="transparent"></div>
+    `;
 
-    const dots = UI_CONFIG.colors.map(c => {
-        let active = c.active;
-        if (isBackground) active = c.color === '#0d1117';
-        if (isBorder) active = c.color === 'rgba(255, 255, 255, 0.08)';
-
-        // If a custom color is active for this picker, standard dots are not active
-        if (customColors[containerId]) active = false;
-
-        let dotStyle = `background: ${c.color};`;
-        if (c.color === 'transparent') {
-            dotStyle = `background: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 8px 8px; background-position: 0 0, 0 4px, 4px 4px, 4px 0; background-color: #fff;`;
+    const favDots = favoriteColors.map(color => {
+        let active = false;
+        if (!customColors[containerId]) {
+            if (containerId === 'colorPicker' && color === '#ffffff') active = true; // Default stroke
         }
-        if (c.border) dotStyle += 'border: 1px solid var(--glass-border);';
+
+        const isBlack = color.toLowerCase() === '#000000';
+        let dotStyle = `background: ${color};`;
+        if (isBlack) dotStyle += 'border: 1px solid var(--glass-border);';
 
         return `
             <div class="color-dot ${active ? 'active' : ''}" 
                  style="${dotStyle}" 
-                 data-color="${c.color}"></div>
+                 data-color="${color}"></div>
         `;
     }).join('');
 
@@ -310,7 +311,8 @@ function renderColorPicker(containerId: string) {
     `;
 
     container.innerHTML = `
-        ${dots}
+        ${transparentDot}
+        ${favDots}
         ${customDotHtml}
         <div class="custom-color-btn" title="Color personalizado">
             <i data-lucide="plus"></i>

@@ -220,133 +220,6 @@
                                 </div>
                             </div>
 
-                            <!-- Group LIENZO -->
-                            <div class="panel-group panel-section-spacing" id="groupCanvas">
-                                <div class="panel-row-header">
-                                    <span class="panel-group-title" data-i18n="canvas">LIENZO</span>
-                                    <div class="panel-group-actions">
-                                    </div>
-                                </div>
-                                <div class="stroke-presets-container" id="canvasSizePresets"></div>
-                                <div class="panel-sub-group">
-                                    <div class="panel-input-group">
-                                        <span class="panel-input-label" data-i18n="width">ANCHO</span>
-                                        <div class="thickness-control">
-                                            <button class="scrub-btn" id="decCanvasWidth"><i
-                                                    data-lucide="minus"></i></button>
-                                            <div class="scrub-area" id="widthScrubArea">
-                                                <input type="number" class="thickness-input" id="canvasWidthVal"
-                                                    value="836">
-                                            </div>
-                                            <button class="scrub-btn" id="incCanvasWidth"><i
-                                                    data-lucide="plus"></i></button>
-                                        </div>
-                                        <input type="range" id="widthSlider" min="200" max="2000" step="10" value="836"
-                                            class="canvas-range">
-                                    </div>
-                                    <div class="panel-input-group">
-                                        <span class="panel-input-label" data-i18n="height">ALTO</span>
-                                        <div class="thickness-control">
-                                            <button class="scrub-btn" id="decCanvasHeight"><i
-                                                    data-lucide="minus"></i></button>
-                                            <div class="scrub-area" id="heightScrubArea">
-                                                <input type="number" class="thickness-input" id="canvasHeightVal"
-                                                    value="400">
-                                            </div>
-                                            <button class="scrub-btn" id="incCanvasHeight"><i
-                                                    data-lucide="plus"></i></button>
-                                        </div>
-                                        <input type="range" id="heightSlider" min="100" max="1000" step="10" value="400"
-                                            class="canvas-range">
-                                    </div>
-
-                                    <div class="panel-input-group">
-                                        <span class="panel-input-label" data-i18n="backgroundColor">COLOR DE
-                                            FONDO</span>
-                                        <div class="color-picker-container">
-                                            <div class="color-picker" id="canvasBgPicker"></div>
-                                            <div class="opacity-control">
-                                                <span class="panel-input-label small">OPACIDAD</span>
-                                                <input type="range" id="bgOpacitySlider" min="0" max="100" step="1"
-                                                    value="100" class="canvas-range small">
-                                                <span id="bgOpacityVal" class="panel-val-text small">100%</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="panel-input-group">
-                                        <div class="panel-input-header">
-                                            <span class="panel-input-label" data-i18n="borderRadius">RADIO DE
-                                                BORDE</span>
-                                            <div class="radius-unit-toggle">
-                                                <span id="radiusVal" class="panel-val-text">0px</span>
-                                                <div class="unit-btns" id="radiusUnitToggle">
-                                                    <button class="unit-btn active" data-unit="px">px</button>
-                                                    <button class="unit-btn" data-unit="%">%</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <input type="range" id="radiusSlider" min="0" max="100" step="1" value="0"
-                                            class="canvas-range">
-                                    </div>
-                                    <div class="panel-input-group">
-                                        <span class="panel-input-label" data-i18n="borderType">TIPO DE BORDE</span>
-                                        <div class="stroke-presets-container" id="borderTypePresets">
-                                            <button class="preset-btn active" data-border-type="solid"
-                                                data-i18n="solid">Sólido</button>
-                                            <button class="preset-btn" data-border-type="dashed"
-                                                data-i18n="dashed">Guiones</button>
-                                            <button class="preset-btn" data-border-type="dotted"
-                                                data-i18n="dotted">Puntos</button>
-                                            <button class="preset-btn" data-border-type="none">None</button>
-                                        </div>
-                                    </div>
-                                    <div class="panel-input-group">
-                                        <span class="panel-input-label" data-i18n="borderColor">COLOR DE BORDE</span>
-                                        <div class="color-picker-container">
-                                            <div class="color-picker" id="canvasBorderColorPicker"></div>
-                                            <div class="opacity-control">
-                                                <span class="panel-input-label small">OPACIDAD</span>
-                                                <input type="range" id="borderOpacitySlider" min="0" max="100" step="1"
-                                                    value="100" class="canvas-range small">
-                                                <span id="borderOpacityVal" class="panel-val-text small">100%</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="panel-input-group">
-                                        <div class="panel-input-header">
-                                            <span class="panel-input-label" data-i18n="borderWidth">GROSOR DE
-                                                BORDE</span>
-                                            <span id="borderWidthVal" class="panel-val-text">1px</span>
-                                        </div>
-                                        <input type="range" id="borderWidthSlider" min="0" max="20" step="1" value="1"
-                                            class="canvas-range">
-                                    </div>
-                                    <div class="panel-input-group" id="borderDashGroup">
-                                        <div class="panel-input-header">
-                                            <span class="panel-input-label" data-i18n="borderSpacing">ESPACIADO DE
-                                                BORDE</span>
-                                            <span id="borderDashVal" class="panel-val-text">4px</span>
-                                        </div>
-                                        <input type="range" id="borderDashSlider" min="1" max="50" step="1" value="4"
-                                            class="canvas-range" disabled>
-                                    </div>
-                                    <div class="panel-input-group">
-                                        <span class="panel-input-label" data-i18n="zoom">ZOOM</span>
-                                        <div class="thickness-control">
-                                            <button class="scrub-btn" id="decZoom"><i data-lucide="minus"></i></button>
-                                            <div class="scrub-area" id="zoomScrubArea">
-                                                <input type="number" class="thickness-input" id="zoomVal" value="100"
-                                                    step="1" min="10" max="500">
-                                                <span class="zoom-unit">%</span>
-                                            </div>
-                                            <button class="scrub-btn" id="incZoom"><i data-lucide="plus"></i></button>
-                                        </div>
-                                        <input type="range" id="zoomSlider" min="10" max="500" step="1" value="100"
-                                            class="canvas-range">
-                                    </div>
-                                </div>
-                            </div>
-
                             <!-- Group TRANSFORMACIÓN -->
                             <div class="panel-group panel-section-spacing" id="groupTransform">
                                 <div class="panel-row-header">
@@ -384,6 +257,133 @@
                                             </div>
                                             <button class="scrub-btn" id="incScale"><i data-lucide="plus"></i></button>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Group LIENZO -->
+                            <div class="panel-group panel-section-spacing" id="groupCanvas">
+                                <div class="panel-row-header">
+                                    <span class="panel-group-title" data-i18n="canvas">LIENZO</span>
+                                    <div class="panel-group-actions">
+                                    </div>
+                                </div>
+                                <div class="stroke-presets-container" id="canvasSizePresets"></div>
+                                <div class="panel-sub-group">
+                                    <div class="panel-input-group">
+                                        <span class="panel-input-label" data-i18n="width">ANCHO</span>
+                                        <div class="thickness-control">
+                                            <button class="scrub-btn" id="decCanvasWidth"><i
+                                                    data-lucide="minus"></i></button>
+                                            <div class="scrub-area" id="widthScrubArea">
+                                                <input type="number" class="thickness-input" id="canvasWidthVal"
+                                                    value="836" min="20">
+                                            </div>
+                                            <button class="scrub-btn" id="incCanvasWidth"><i
+                                                    data-lucide="plus"></i></button>
+                                        </div>
+                                        <input type="range" id="widthSlider" min="20" max="2000" step="10" value="836"
+                                            class="canvas-range">
+                                    </div>
+                                    <div class="panel-input-group">
+                                        <span class="panel-input-label" data-i18n="height">ALTO</span>
+                                        <div class="thickness-control">
+                                            <button class="scrub-btn" id="decCanvasHeight"><i
+                                                    data-lucide="minus"></i></button>
+                                            <div class="scrub-area" id="heightScrubArea">
+                                                <input type="number" class="thickness-input" id="canvasHeightVal"
+                                                    value="400" min="20">
+                                            </div>
+                                            <button class="scrub-btn" id="incCanvasHeight"><i
+                                                    data-lucide="plus"></i></button>
+                                        </div>
+                                        <input type="range" id="heightSlider" min="20" max="1000" step="10" value="400"
+                                            class="canvas-range">
+                                    </div>
+
+                                    <div class="panel-input-group">
+                                        <span class="panel-input-label" data-i18n="zoom">ZOOM</span>
+                                        <div class="thickness-control">
+                                            <button class="scrub-btn" id="decZoom"><i data-lucide="minus"></i></button>
+                                            <div class="scrub-area" id="zoomScrubArea">
+                                                <input type="number" class="thickness-input" id="zoomVal" value="100"
+                                                    step="1" min="10" max="500">
+                                                <span class="zoom-unit">%</span>
+                                            </div>
+                                            <button class="scrub-btn" id="incZoom"><i data-lucide="plus"></i></button>
+                                        </div>
+                                        <input type="range" id="zoomSlider" min="10" max="500" step="1" value="100"
+                                            class="canvas-range">
+                                    </div>
+                                    <div class="panel-input-group">
+                                        <span class="panel-input-label" data-i18n="backgroundColor">COLOR DE
+                                            FONDO</span>
+                                        <div class="color-picker-container">
+                                            <div class="color-picker" id="canvasBgPicker"></div>
+                                            <div class="opacity-control">
+                                                <span class="panel-input-label small">OPACIDAD</span>
+                                                <input type="range" id="bgOpacitySlider" min="0" max="100" step="1"
+                                                    value="100" class="canvas-range small">
+                                                <span id="bgOpacityVal" class="panel-val-text small">100%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="panel-input-group">
+                                        <span class="panel-input-label" data-i18n="borderType">TIPO DE BORDE</span>
+                                        <div class="stroke-presets-container" id="borderTypePresets">
+                                            <button class="preset-btn" data-border-type="solid"
+                                                data-i18n="solid">Sólido</button>
+                                            <button class="preset-btn" data-border-type="dashed"
+                                                data-i18n="dashed">Guiones</button>
+                                            <button class="preset-btn" data-border-type="dotted"
+                                                data-i18n="dotted">Puntos</button>
+                                            <button class="preset-btn active" data-border-type="none">None</button>
+                                        </div>
+                                    </div>
+                                    <div class="panel-input-group">
+                                        <span class="panel-input-label" data-i18n="borderColor">COLOR DE BORDE</span>
+                                        <div class="color-picker-container">
+                                            <div class="color-picker" id="canvasBorderColorPicker"></div>
+                                            <div class="opacity-control">
+                                                <span class="panel-input-label small">OPACIDAD</span>
+                                                <input type="range" id="borderOpacitySlider" min="0" max="100" step="1"
+                                                    value="100" class="canvas-range small">
+                                                <span id="borderOpacityVal" class="panel-val-text small">100%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="panel-input-group">
+                                        <div class="panel-input-header">
+                                            <span class="panel-input-label" data-i18n="borderRadius">RADIO DE
+                                                BORDE</span>
+                                            <div class="radius-unit-toggle">
+                                                <span id="radiusVal" class="panel-val-text">0px</span>
+                                                <div class="unit-btns" id="radiusUnitToggle">
+                                                    <button class="unit-btn active" data-unit="px">px</button>
+                                                    <button class="unit-btn" data-unit="%">%</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <input type="range" id="radiusSlider" min="0" max="100" step="1" value="0"
+                                            class="canvas-range">
+                                    </div>
+                                    <div class="panel-input-group">
+                                        <div class="panel-input-header">
+                                            <span class="panel-input-label" data-i18n="borderWidth">GROSOR DE
+                                                BORDE</span>
+                                            <span id="borderWidthVal" class="panel-val-text">1px</span>
+                                        </div>
+                                        <input type="range" id="borderWidthSlider" min="0" max="20" step="1" value="1"
+                                            class="canvas-range">
+                                    </div>
+                                    <div class="panel-input-group" id="borderDashGroup">
+                                        <div class="panel-input-header">
+                                            <span class="panel-input-label" data-i18n="borderSpacing">ESPACIADO DE
+                                                BORDE</span>
+                                            <span id="borderDashVal" class="panel-val-text">4px</span>
+                                        </div>
+                                        <input type="range" id="borderDashSlider" min="1" max="50" step="1" value="4"
+                                            class="canvas-range" disabled>
                                     </div>
                                 </div>
                             </div>
@@ -447,7 +447,14 @@
     <div id="advancedColorPicker" class="floating-window hidden">
         <div class="window-header">
             <span>Selector de Color Avanzado</span>
-            <button class="close-btn" id="closeAdvancedPicker"><i data-lucide="x"></i></button>
+            <div class="header-actions">
+                <button class="icon-btn" id="addFavoriteBtn" title="Añadir a favoritos">
+                    <i data-lucide="star"></i>
+                </button>
+                <button class="close-btn" id="closeAdvancedPicker">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
         </div>
         <div class="window-content">
             <div class="picker-main">
@@ -458,20 +465,50 @@
                 <div class="hue-slider-container">
                     <input type="range" id="hueSlider" min="0" max="360" step="1" value="0">
                 </div>
+
+                <div class="favorites-section">
+                    <span class="section-label">FAVORITOS</span>
+                    <div id="advancedFavorites" class="favorites-grid">
+                        <!-- Favorites dots injected here -->
+                    </div>
+                </div>
+
                 <div class="rgb-inputs">
-                    <div class="rgb-field"><span>R</span><input type="number" id="rInput" min="0" max="255" value="255">
+                    <div class="rgb-field">
+                        <span>R</span>
+                        <div class="custom-number-input">
+                            <input type="number" id="rInput" min="0" max="255" value="255">
+                            <div class="input-arrows">
+                                <button class="arrow-up"><i data-lucide="chevron-up"></i></button>
+                                <button class="arrow-down"><i data-lucide="chevron-down"></i></button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="rgb-field"><span>G</span><input type="number" id="gInput" min="0" max="255" value="0">
+                    <div class="rgb-field">
+                        <span>G</span>
+                        <div class="custom-number-input">
+                            <input type="number" id="gInput" min="0" max="255" value="0">
+                            <div class="input-arrows">
+                                <button class="arrow-up"><i data-lucide="chevron-up"></i></button>
+                                <button class="arrow-down"><i data-lucide="chevron-down"></i></button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="rgb-field"><span>B</span><input type="number" id="bInput" min="0" max="255" value="0">
+                    <div class="rgb-field">
+                        <span>B</span>
+                        <div class="custom-number-input">
+                            <input type="number" id="bInput" min="0" max="255" value="0">
+                            <div class="input-arrows">
+                                <button class="arrow-up"><i data-lucide="chevron-up"></i></button>
+                                <button class="arrow-down"><i data-lucide="chevron-down"></i></button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="hex-input-group">
                     <span>HEX</span>
                     <input type="text" id="hexInput" value="#FF0000">
-                    <div id="currentColorPreview"
-                        style="width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--glass-border);">
-                    </div>
+                    <div id="currentColorPreview"></div>
                 </div>
                 <button id="applyAdvancedColor" class="apply-btn">Aplicar Color</button>
             </div>
