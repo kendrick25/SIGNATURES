@@ -21,12 +21,12 @@ export function updateSelectedBounds(customData: any = null) {
 
     const zoom = State.workspaceScale;
 
-    // Bounding box only exists in transform mode now
+    // Bounding box only exists in transform mode
     el.classList.remove('no-handles');
-    el.style.border = `${1.5 / zoom}px dashed var(--primary)`;
+    el.style.border = `${1 / zoom}px dashed var(--primary)`;
+    el.style.background = 'rgba(99, 102, 241, 0.02)'; // Subtle area tint
     el.style.opacity = '1';
     el.style.pointerEvents = 'auto';
-    el.style.background = 'transparent';
 
     const handles = el.querySelectorAll('.resize-handle') as NodeListOf<HTMLElement>;
     handles.forEach(h => {
@@ -84,12 +84,17 @@ export function syncControlsWithSelection() {
         dot.classList.toggle('active', dot.getAttribute('data-color')?.toLowerCase() === base.toLowerCase());
     });
 
-    const variety = (first.maxWidth || 0) / (first.minWidth || 0.1);
-    let detectedType = 'natural';
-    if (variety >= 7) detectedType = 'brush';
-    else if (variety >= 3) detectedType = 'pen';
-    else if (variety < 1.1) detectedType = 'marker';
-    else detectedType = 'natural';
+    const s = first as any;
+    let detectedType = s.strokeType || 'natural';
+
+    // If no explicit type stored, fallback to detection by variety
+    if (!s.strokeType) {
+        const variety = (s.maxWidth || 0) / (s.minWidth || 0.1);
+        if (variety >= 7) detectedType = 'brush';
+        else if (variety >= 3) detectedType = 'pen';
+        else if (variety < 1.1) detectedType = 'marker';
+        else detectedType = 'natural';
+    }
 
     setStrokeType(detectedType);
     const strokeBtns = document.querySelectorAll('#strokeTypePresets .preset-btn');

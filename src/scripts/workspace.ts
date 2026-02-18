@@ -1,5 +1,6 @@
 import { container, workspace, workspacePan, workspaceScale, ratio, signaturePad, canvas, sctx, ctx, selectionCanvas, selectedStrokeIndices, CANVAS_MARGIN } from '@/scripts/state';
 import { drawSelectionHighlights, updateHintVisibility, safeFromData } from '@/scripts/canvas';
+import { updateSelectedBounds } from '@/scripts/ui_updates';
 
 
 
@@ -32,10 +33,12 @@ export function updateWorkspaceTransform() {
 
 export function updateSignaturePadOptions() {
     if (!signaturePad) return;
-    // Balanced adjustment: enough points for curves, not too many to cause jitter
-    // A small minDistance (0.5 to 1.0) helps significantly with "pixelation" in curves by filtering sensor noise.
-    signaturePad.minDistance = 0.2;
-    signaturePad.throttle = 0;
+    // Balanced adjustment for ultra-smooth curves
+    // We delegate logic to ensure consistency, but if we have circular dependency issues, 
+    // we'll manually set the most safe defaults here.
+    // The actual tool styles are re-applied by the UI interactions.
+    signaturePad.throttle = 8;     // Small buffer to smooth out high-frequency sensor noise
+    signaturePad.minDistance = 1.0; // Minimal filter to prevent micro-jitter while keeping detail
 }
 
 export function syncSizeValues() {
@@ -171,7 +174,7 @@ export function autoAdjustCanvas() {
     const currentW = maxX - minX;
     const currentH = maxY - minY;
 
-    const padding = 60; // Comfortable padding
+    const padding = 0; // No padding as requested
     const availableW = Math.max(100, container.offsetWidth - padding);
     const availableH = Math.max(100, container.offsetHeight - padding);
 
@@ -231,4 +234,10 @@ export function recenterCanvas() {
     workspacePan.y = (viewportRect.height - containerHeight * workspaceScale) / 2;
 
     updateWorkspaceTransform();
+
+    // Update selection bounds if there are selected strokes
+    if (selectedStrokeIndices.length > 0) {
+        updateSelectedBounds();
+        drawSelectionHighlights();
+    }
 }

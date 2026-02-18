@@ -52,11 +52,11 @@ export function initApp() {
     const pad = new SignaturePad(canvas, {
         backgroundColor: 'rgba(0,0,0,0)',
         penColor: lastBaseColor,
-        minWidth: 0.8,
-        maxWidth: 3.8,
-        velocityFilterWeight: 0.4, // Balanced: smoother than raw, but faithful to hand jitter
-        throttle: 0,               // Max points for smooth curves (0ms)
-        minDistance: 0.2           // High precision for tight circles/semicircles
+        minWidth: 1.2,
+        maxWidth: 4.2,
+        velocityFilterWeight: 0.6,
+        throttle: 8,
+        minDistance: 1.0
     });
 
     setSignaturePad(pad);

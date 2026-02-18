@@ -94,7 +94,10 @@ export const i18n: I18nContent = {
         viewClipOutOfBounds: "OCULTAR TRAZOS FUERA DEL LIENZO",
         copyImage: "Copiar Imagen",
         copyBase64: "Copiar Base64",
-        download: "Descargar Archivo"
+        download: "Descargar Archivo",
+        uniform: "TRAZO UNIFORME",
+        smoothing: "SUAVIZADO DE CURVAS",
+        colorQuality: "INTENSIDAD DE COLOR"
     },
     en: {
         drawMode: "Drawing Mode (P)",
@@ -185,7 +188,10 @@ export const i18n: I18nContent = {
         viewClipOutOfBounds: "HIDE STROKES OUTSIDE CANVAS",
         copyImage: "Copy Image",
         copyBase64: "Copy Base64",
-        download: "Download File"
+        download: "Download File",
+        uniform: "UNIFORM STROKE",
+        smoothing: "CURVE SMOOTHING",
+        colorQuality: "COLOR INTENSITY"
     }
 };
 

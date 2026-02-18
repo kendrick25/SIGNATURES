@@ -104,6 +104,35 @@
                                         <div class="color-picker" id="colorPicker"></div>
                                     </div>
                                     <div class="panel-input-group">
+                                        <div
+                                            style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                            <span class="panel-input-label" data-i18n="uniform" style="margin: 0;">TRAZO
+                                                UNIFORME</span>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="uniformToggle">
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="panel-input-group">
+                                        <div class="panel-input-header">
+                                            <span class="panel-input-label" data-i18n="smoothing">SUAVIZADO DE
+                                                CURVAS</span>
+                                            <span id="smoothingVal" class="panel-val-text">60%</span>
+                                        </div>
+                                        <input type="range" id="smoothingSlider" min="0" max="1" step="0.05" value="0.6"
+                                            class="alpha-slider">
+                                    </div>
+                                    <div class="panel-input-group">
+                                        <div class="panel-input-header">
+                                            <span class="panel-input-label" data-i18n="colorQuality">INTENSIDAD DE
+                                                COLOR</span>
+                                            <span id="colorQualityVal" class="panel-val-text">100%</span>
+                                        </div>
+                                        <input type="range" id="colorQualitySlider" min="0.5" max="2.0" step="0.1"
+                                            value="1.0" class="alpha-slider">
+                                    </div>
+                                    <div class="panel-input-group">
                                         <div class="panel-input-header">
                                             <span class="panel-input-label" data-i18n="opacity">OPACIDAD</span>
                                             <span id="alphaVal" class="panel-val-text">100%</span>
@@ -467,6 +496,8 @@
                         <button class="preset-btn" data-format="JPG">JPG</button>
                         <button class="preset-btn" data-format="WEBP">WEBP</button>
                         <button class="preset-btn" data-format="SVG">SVG</button>
+                        <button class="preset-btn" data-format="BMP">BMP</button>
+                        <button class="preset-btn" data-format="TIFF">TIFF</button>
                     </div>
                 </div>
 

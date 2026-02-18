@@ -15,7 +15,8 @@ import {
     updateStrokePreview, downloadPng, downloadSvg, copyPngToClipboard,
     copySelection, pasteSelection, deleteSelection,
     rotateSelection90, flipSelection, scaleSelection, showToast, updateHintVisibility, safeFromData, copyPngBase64, copySvgBase64,
-    downloadJpg, downloadWebp, copyJpgBase64, copyWebpBase64, triggerExport, updateExportPreview, updateModalContext
+    downloadJpg, downloadWebp, copyJpgBase64, copyWebpBase64, triggerExport, updateExportPreview, updateModalContext,
+    updateUniform, updateSmoothing, updateColorQuality, downloadBmp, downloadTiff
 } from '@/scripts/canvas';
 import {
     updateWorkspaceTransform, syncSizeValues,
@@ -257,6 +258,15 @@ function attachEventListeners() {
         updateHintVisibility();
     });
 
+    signaturePad.addEventListener("endStroke", () => {
+        const data = signaturePad.toData();
+        if (data.length > 0) {
+            const last = data[data.length - 1] as any;
+            last.strokeType = State.currentStrokeType;
+            last.isUniform = State.isUniform;
+        }
+    });
+
 
     document.getElementById('workspaceToggle')?.addEventListener('click', () => {
         sidePanel.classList.toggle('minimized');
@@ -473,16 +483,20 @@ function attachDynamicListeners() {
                 else if (format === 'SVG') downloadSvg();
                 else if (format === 'JPG') downloadJpg();
                 else if (format === 'WEBP') downloadWebp();
+                else if (format === 'BMP') downloadBmp();
+                else if (format === 'TIFF') downloadTiff();
             } else if (action === 'copy') {
                 if (format === 'PNG') copyPngToClipboard();
-                else if (format === 'SVG') copySvgBase64();
+                else if (format === 'SVG') copySvgBase64(); // SVG copy usually base64 text or blob
                 else if (format === 'JPG') copyJpgBase64();
                 else if (format === 'WEBP') copyWebpBase64();
+                else showToast("Función 'Copiar' no disponible para " + format, "#f59e0b");
             } else if (action === 'base64') {
                 if (format === 'PNG') copyPngBase64();
                 else if (format === 'SVG') copySvgBase64();
                 else if (format === 'JPG') copyJpgBase64();
                 else if (format === 'WEBP') copyWebpBase64();
+                else showToast("Base64 no disponible para " + format, "#f59e0b");
             }
         }
 
@@ -491,11 +505,13 @@ function attachDynamicListeners() {
         if (target.closest('#undoBtn')) undo();
         if (target.closest('#redoBtn')) redo();
         if (target.closest('#clearBtn')) {
-            if (!signaturePad.isEmpty()) {
+            const data = signaturePad.toData();
+            if (data.length > 0) {
                 saveState();
-                signaturePad.clear();
+                signaturePad.clear(); // Patched clear in workspace.ts handles physical canvas and sctx
                 updateHintVisibility();
                 deselectStroke(false);
+                updateHistoryButtons();
             }
         }
 
@@ -540,6 +556,18 @@ function attachControlListeners() {
         const valEl = document.getElementById('alphaVal');
         if (valEl) valEl.innerText = Math.round(val * 100) + '%';
         applyColor(lastBaseColor);
+    });
+
+    document.getElementById('uniformToggle')?.addEventListener('change', (e: any) => {
+        updateUniform(e.target.checked);
+    });
+
+    document.getElementById('smoothingSlider')?.addEventListener('input', (e: any) => {
+        updateSmoothing(parseFloat(e.target.value));
+    });
+
+    document.getElementById('colorQualitySlider')?.addEventListener('input', (e: any) => {
+        updateColorQuality(parseFloat(e.target.value));
     });
 
     const updateCanvasW = (w: any) => {
@@ -839,7 +867,7 @@ function attachControlListeners() {
 
 export function updateWorkspaceView() {
     if (!container) return;
-    container.style.overflow = State.viewClipOutOfBounds ? 'hidden' : 'visible';
+    container.classList.toggle('clipped', State.viewClipOutOfBounds);
 }
 
 function updateCanvasBackground() {
@@ -1395,12 +1423,23 @@ let transformPivot = { x: 0, y: 0, minX: 0, minY: 0, width: 0, height: 0 };
 let modeBeforeMiddleClick: string | null = null;
 
 function updateCursor(e: PointerEvent) {
+    // 1. Priority: Active drag states (locked cursors)
     if (State.isPanning) { document.body.style.cursor = 'grabbing'; return; }
+    if (State.isMoving) { document.body.style.cursor = 'move'; return; }
+    if (State.isResizing) {
+        if (resizeType === 'r') { document.body.style.cursor = 'ew-resize'; return; }
+        if (resizeType === 'b') { document.body.style.cursor = 'ns-resize'; return; }
+        if (resizeType === 'br') { document.body.style.cursor = 'nwse-resize'; return; }
+        return;
+    }
+    if (State.isRotating) { document.body.style.cursor = 'grabbing'; return; }
+
     const target = e.target as HTMLElement;
     if (target.closest('.side-panel, .app-header')) {
         document.body.style.cursor = 'default'; return;
     }
 
+    // 2. Hover states for different modes
     if (State.currentMode === 'pan') { document.body.style.cursor = 'grab'; }
     else if (State.currentMode === 'draw') { document.body.style.cursor = 'crosshair'; }
     else if (State.currentMode === 'select' || State.currentMode === 'transform') {
@@ -1414,7 +1453,8 @@ function updateCursor(e: PointerEvent) {
         } else {
             const { x: cx, y: cy } = getCanvasCoordinates(e);
             const bounds = getSelectedDataBounds();
-            if (cx >= bounds.minX && cx <= bounds.maxX && cy >= bounds.minY && cy <= bounds.maxY) {
+            // Check if mouse is over any selected stroke or well within the selection box
+            if (cx >= bounds.minX - 5 && cx <= bounds.maxX + 5 && cy >= bounds.minY - 5 && cy <= bounds.maxY + 5) {
                 document.body.style.cursor = 'move';
             } else { document.body.style.cursor = 'default'; }
         }
@@ -1442,7 +1482,7 @@ function handlePointerDown(e: PointerEvent) {
             minX: bounds.minX, minY: bounds.minY, width: Math.max(1, bounds.maxX - bounds.minX), height: Math.max(1, bounds.maxY - bounds.minY)
         };
         if (resizeType === 'rotate') { setRotating(true); rotateStart.angle = Math.atan2(cy - transformPivot.y, cx - transformPivot.x); }
-        else { setResizing(true); resizeStart.x = cx; resizeStart.y = cy; }
+        else { setResizing(true, resizeType); resizeStart.x = cx; resizeStart.y = cy; }
         (e.target as HTMLElement).setPointerCapture(e.pointerId); return;
     }
 

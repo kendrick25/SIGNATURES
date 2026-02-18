@@ -258,6 +258,12 @@
     will-change: transform;
     border: 1px solid rgba(255, 255, 255, 0.08); // Default border to allow radius support
 
+    &.clipped {
+        #signatureCanvas {
+            clip-path: inset(400px); // Clipped to container bounds (offsetting margin)
+        }
+    }
+
     &::after {
         content: '';
         position: absolute;
@@ -370,16 +376,19 @@ canvas#signatureCanvas {
 .handle-r {
     top: 50%;
     left: 100%;
+    cursor: ew-resize;
 }
 
 .handle-b {
     top: 100%;
     left: 50%;
+    cursor: ns-resize;
 }
 
 .handle-br {
     top: 100%;
     left: 100%;
+    cursor: nwse-resize;
 }
 
 .handle-rotate {
@@ -402,6 +411,38 @@ canvas#signatureCanvas {
         transform: translateX(-50%);
     }
 }
+
+// Force cursor during active transformations
+body.is-resizing-r,
+body.is-resizing-r * {
+    cursor: ew-resize !important;
+}
+
+body.is-resizing-b,
+body.is-resizing-b * {
+    cursor: ns-resize !important;
+}
+
+body.is-resizing-br,
+body.is-resizing-br * {
+    cursor: nwse-resize !important;
+}
+
+body.is-moving,
+body.is-moving * {
+    cursor: move !important;
+}
+
+body.is-rotating,
+body.is-rotating * {
+    cursor: grabbing !important;
+}
+
+body.is-panning,
+body.is-panning * {
+    cursor: grabbing !important;
+}
+
 
 .canvas-hint {
     position: absolute;
