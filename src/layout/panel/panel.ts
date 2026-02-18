@@ -143,6 +143,17 @@ export const PanelHTML = `
                                     </label>
                                 </div>
                             </div>
+                            <div class="panel-input-group">
+                                <div
+                                    style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                    <span class="panel-input-label" data-i18n="showGrid"
+                                        style="margin: 0;">VER CUADRÍCULA</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="gridToggle" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
                             <div class="stroke-presets-container" id="canvasSizePresets"></div>
                             <div class="panel-input-group">
                                 <span class="panel-input-label" data-i18n="width">ANCHO</span>

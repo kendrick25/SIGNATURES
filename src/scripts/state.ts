@@ -46,6 +46,7 @@ export let exportFormat = 'PNG';
 export let exportAction = 'download';
 export let exportClipOutOfBounds = true;
 export let viewClipOutOfBounds = true;
+export let showGrid = true;
 export let exportTarget: { format: string, action: 'download' | 'copy' | 'base64', isBase64?: boolean } | null = null;
 export let exportScale = 1;
 export let exportMargin = 0;
@@ -101,7 +102,8 @@ export const State = {
     get exportPreset() { return exportPreset; },
     get isUniform() { return isUniform; },
     get smoothing() { return smoothing; },
-    get colorQuality() { return colorQuality; }
+    get colorQuality() { return colorQuality; },
+    get showGrid() { return showGrid; }
 };
 
 export const setThickness = (val: number) => { currentThickness = val; };
@@ -145,6 +147,7 @@ export const setExportFormat = (val: string) => { exportFormat = val; };
 export const setExportAction = (val: string) => { exportAction = val; };
 export const setExportClipOutOfBounds = (val: boolean) => { exportClipOutOfBounds = val; };
 export const setViewClipOutOfBounds = (val: boolean) => { viewClipOutOfBounds = val; };
+export const setShowGrid = (val: boolean) => { showGrid = val; };
 export const setExportTarget = (val: { format: string, action: 'download' | 'copy' | 'base64', isBase64?: boolean } | null) => { exportTarget = val; };
 export const setExportScale = (val: number) => { exportScale = val; };
 export const setExportMargin = (val: number) => { exportMargin = val; };
@@ -175,6 +178,7 @@ export let hint: HTMLElement;
 export let selectionBox: HTMLElement;
 export let sidePanel: HTMLElement;
 export let selectionInfo: HTMLElement;
+export let colorLayer: HTMLElement;
 
 export const setDomRefs = (refs: any) => {
     canvas = refs.canvas;
@@ -187,6 +191,7 @@ export const setDomRefs = (refs: any) => {
     selectionBox = refs.selectionBox;
     sidePanel = refs.sidePanel;
     selectionInfo = refs.selectionInfo;
+    colorLayer = refs.colorLayer;
 };
 
 // Dynamic references

@@ -3,6 +3,8 @@ export const WorkspaceHTML = `
     <div class="workspace" id="workspace">
         <div class="canvas-view-port">
             <div class="canvas-container" id="canvasContainer">
+                <div class="canvas-background" id="canvasBackground"></div>
+                <div class="canvas-color-layer" id="canvasColorLayer"></div>
                 <div class="canvas-hint" id="canvasHint">
                     <i data-lucide="pen-tool" class="hint-icon"></i>
                     <span data-i18n="canvasHint">Dibuja tu firma aquí</span><br>

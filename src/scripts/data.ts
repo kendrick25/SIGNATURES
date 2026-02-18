@@ -1,5 +1,5 @@
 import { createIcons as lucideCreateIcons, icons } from 'lucide';
-import { currentLang, UIConfig, I18nContent, setDynamicRefs, customColors, favoriteColors, State } from '@/scripts/state';
+import { currentLang, UIConfig, I18nContent, setDynamicRefs, customColors, favoriteColors, State, setLang } from '@/scripts/state';
 
 // ... (skipping i18n and UI_CONFIG constant definitions which are huge)
 
@@ -97,7 +97,8 @@ export const i18n: I18nContent = {
         download: "Descargar Archivo",
         uniform: "TRAZO UNIFORME",
         smoothing: "SUAVIZADO DE CURVAS",
-        colorQuality: "INTENSIDAD DE COLOR"
+        colorQuality: "INTENSIDAD DE COLOR",
+        showGrid: "VER CUADRÍCULA"
     },
     en: {
         drawMode: "Drawing Mode (P)",
@@ -191,7 +192,8 @@ export const i18n: I18nContent = {
         download: "Download File",
         uniform: "UNIFORM STROKE",
         smoothing: "CURVE SMOOTHING",
-        colorQuality: "COLOR INTENSITY"
+        colorQuality: "COLOR INTENSITY",
+        showGrid: "SHOW GRID"
     }
 };
 
@@ -343,9 +345,10 @@ function renderColorPicker(containerId: string) {
             if (containerId === 'colorPicker' && color === '#ffffff') active = true; // Default stroke
         }
 
+        const isLight = color.toLowerCase() === '#ffffff' || color.toLowerCase() === '#ffffff';
         const isBlack = color.toLowerCase() === '#000000';
         let dotStyle = `background: ${color};`;
-        if (isBlack) dotStyle += 'border: 1px solid var(--glass-border);';
+        if (isBlack || isLight) dotStyle += 'border: 1px solid var(--glass-border);';
 
         return `
             <div class="color-dot ${active ? 'active' : ''}" 
@@ -388,7 +391,7 @@ function renderCanvasPresets() {
 function renderLanguageButtons() {
     const containers = document.querySelectorAll('.panel-lang-container');
     const html = UI_CONFIG.languages.map(lang => `
-        <button class="lang-btn ${lang.id === currentLang ? 'active' : ''}" 
+        <button class="lang-btn ${lang.id === State.currentLang ? 'active' : ''}" 
                 data-lang="${lang.id}">
             ${lang.label}
         </button>
@@ -451,6 +454,7 @@ export function updateGlobalReferences() {
 }
 
 export function updateLanguage(lang: string) {
+    setLang(lang);
     document.documentElement.lang = lang;
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');

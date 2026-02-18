@@ -15,25 +15,30 @@ const init = () => {
         initAppLogic();
         console.log("App Ready.");
 
-        // Reveal the application with a small delay for smoothness
+        // Wait for the signature animation loop to complete for a premium feel
         setTimeout(() => {
             const splash = document.getElementById('splash-screen');
             if (splash) {
                 splash.style.opacity = '0';
                 splash.style.visibility = 'hidden';
 
-                // Stop any running animations to save resources
+                // Freeze animations at their current (final) state before fading
                 const progress = splash.querySelector('.splash-progress');
-                const logo = splash.querySelector('.splash-logo');
-                if (progress) (progress as HTMLElement).style.animation = 'none';
-                if (logo) (logo as HTMLElement).style.animation = 'none';
+                const sigPath = splash.querySelector('.signature-path');
+                const revealRect = splash.querySelector('.reveal-rect');
+                const pen = splash.querySelector('.pen-icon');
+
+                if (progress) (progress as HTMLElement).style.animationPlayState = 'paused';
+                if (sigPath) (sigPath as HTMLElement).style.animationPlayState = 'paused';
+                if (revealRect) (revealRect as HTMLElement).style.animationPlayState = 'paused';
+                if (pen) (pen as HTMLElement).style.animationPlayState = 'paused';
 
                 // Completely remove from DOM after transition
                 setTimeout(() => splash.remove(), 600);
             }
             document.body.classList.add('ready');
             window.dispatchEvent(new Event('resize'));
-        }, 100);
+        }, 4000);
     } catch (err) {
         console.error("Initialization failed:", err);
         document.body.classList.add('ready');

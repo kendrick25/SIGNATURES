@@ -1,6 +1,6 @@
 import {
     State, signaturePad, history, redoStack, setSelectedIndices, setRedoStack, setThickness, setLastColor,
-    sctx, selectionCanvas, setStrokeType, ratio, setClipboardStrokes, canvas, container, CANVAS_MARGIN,
+    sctx, selectionCanvas, setStrokeType, ratio, setClipboardStrokes, canvas, container, colorLayer, CANVAS_MARGIN,
     setExportClipOutOfBounds, setUniform, setSmoothing, setColorQuality, ctx
 } from '@/scripts/state';
 import { updateSelectedBounds, syncControlsWithSelection, updateTransformPanelState, updateSelectionInfo } from '@/scripts/ui_updates';
@@ -603,7 +603,7 @@ function getExportCanvas() {
     ectx.imageSmoothingQuality = 'high';
 
     // 5. Background & Border (Strokes come after in temp pad)
-    const bgColor = container.style.backgroundColor;
+    const bgColor = colorLayer?.style.backgroundColor || 'transparent';
     const isTransparent = !bgColor || bgColor === 'transparent' || bgColor.includes('rgba(0, 0, 0, 0)');
     const radiusRaw = parseFloat((document.getElementById('radiusSlider') as HTMLInputElement)?.value || "0");
     const radius = State.exportPreset === 'HD' || State.exportPreset === 'FHD' || State.exportPreset === '4K' || State.exportPreset === 'CUSTOM'
@@ -751,8 +751,8 @@ export function getExportSvg(): string {
     const renderScale = extraScale;
 
     // 4. SVG Generation
-    const computedStyle = window.getComputedStyle(container);
-    const bgColor = container.style.backgroundColor || computedStyle.backgroundColor || "transparent";
+    const computedStyle = colorLayer ? window.getComputedStyle(colorLayer) : window.getComputedStyle(container);
+    const bgColor = colorLayer?.style.backgroundColor || computedStyle.backgroundColor || "transparent";
     const isTransparent = !bgColor || bgColor === 'transparent' || bgColor.includes('rgba(0, 0, 0, 0)');
     const radiusRaw = parseFloat((document.getElementById('radiusSlider') as HTMLInputElement)?.value || '0');
     const radius = State.exportPreset === 'HD' || State.exportPreset === 'FHD' || State.exportPreset === '4K' || State.exportPreset === 'CUSTOM'

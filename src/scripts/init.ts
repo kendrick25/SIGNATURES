@@ -13,6 +13,7 @@ export function initApp() {
     const selectionBox = document.getElementById('dragSelection') as HTMLElement;
     const selectionInfo = document.getElementById('selectionInfo') as HTMLElement;
     const sidePanel = document.getElementById('sidePanel') as HTMLElement;
+    const colorLayer = document.getElementById('canvasColorLayer') as HTMLElement;
 
     if (!canvas || !containerRef) {
         throw new Error("Critical DOM elements missing: signatureCanvas or canvasContainer");
@@ -33,7 +34,8 @@ export function initApp() {
         selectionInfo,
         sidePanel,
         ctx,
-        sctx
+        sctx,
+        colorLayer
     });
 
     console.log("initApp: Rendering UI...");

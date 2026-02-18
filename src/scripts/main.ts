@@ -6,8 +6,8 @@ import {
     setSelectedIndices, history, redoStack, currentLang,
     workspace, selectionBox,
     sidePanel, lastBaseColor, setAlpha,
-    container, canvas, selectionCanvas, setWorkspaceScale, customColors,
-    favoriteColors, setFavoriteColors, setExportQuality, setExportDpi, setExportFormat, setExportAction, setExportClipOutOfBounds, setViewClipOutOfBounds, setExportScale, setExportMargin, setExportPreset, CANVAS_MARGIN
+    container, canvas, selectionCanvas, colorLayer, setWorkspaceScale, customColors,
+    favoriteColors, setFavoriteColors, setExportQuality, setExportDpi, setExportFormat, setExportAction, setExportClipOutOfBounds, setViewClipOutOfBounds, setShowGrid, setExportScale, setExportMargin, setExportPreset, CANVAS_MARGIN
 } from '@/scripts/state';
 import {
     saveState, undo, redo, updateThickness, applyStrokeType,
@@ -44,6 +44,11 @@ export function initAppLogic() {
     updateStrokePreview();
     updateHistoryButtons();
     updateCanvasBorder();
+    if (container && !container.dataset.bgColor) {
+        container.dataset.bgColor = window.getComputedStyle(container).backgroundColor || '#0f172a';
+    }
+    updateCanvasBackground();
+    updateWorkspaceView();
 
     (window as any).currentMode = 'draw';
     setMode('draw');
@@ -377,7 +382,7 @@ function attachDynamicListeners() {
                 applyColor(color);
             } else if (picker.id === 'canvasBgPicker') {
                 if (container) {
-                    container.style.backgroundColor = color;
+                    container.dataset.bgColor = color;
                     updateCanvasBackground();
                 }
             } else if (picker.id === 'canvasBorderColorPicker') {
@@ -752,6 +757,11 @@ function attachControlListeners() {
         updateWorkspaceView();
     });
 
+    document.getElementById('gridToggle')?.addEventListener('change', (e: any) => {
+        setShowGrid(e.target.checked);
+        updateWorkspaceView();
+    });
+
     // --- New Export Controls ---
     // --- New Export Controls ---
     // --- New Export Controls ---
@@ -869,16 +879,18 @@ function attachControlListeners() {
 }
 
 export function updateWorkspaceView() {
-    if (!container) return;
-    container.classList.toggle('clipped', State.viewClipOutOfBounds);
+    if (container) container.classList.toggle('clipped', State.viewClipOutOfBounds);
+    if (workspace) workspace.classList.toggle('show-grid', State.showGrid);
 }
 
 function updateCanvasBackground() {
-    if (!container) return;
-    const bgColor = container.style.backgroundColor || '#0d1117';
+    if (!colorLayer || !container) return;
+    const bgColor = container.dataset.bgColor || '#0f172a';
     // If it's hex, convert to rgba. If it's already rgba, we replace the alpha.
     const finalColor = applyAlpha(bgColor, bgOpacity);
-    container.style.backgroundColor = finalColor;
+    colorLayer.style.backgroundColor = finalColor;
+    // Keep container transparent so we see the premium background through it
+    container.style.backgroundColor = 'transparent';
 }
 
 function applyAlpha(color: string, alpha: number) {
@@ -1330,7 +1342,7 @@ function applySelectedColor(color: string) {
         applyColor(color);
     } else if (activePickerId === 'canvasBgPicker') {
         if (container) {
-            container.style.backgroundColor = color;
+            container.dataset.bgColor = color;
             updateCanvasBackground();
         }
     } else if (activePickerId === 'canvasBorderColorPicker') {
