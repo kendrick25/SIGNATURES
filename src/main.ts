@@ -1,10 +1,14 @@
 import '@/styles/style.scss';
+import { assembleFullLayout } from '@/layout/main-layout';
 import { initApp } from '@/scripts/init';
 import { initAppLogic } from '@/scripts/main';
 
 // Initialize the application
 const init = () => {
     try {
+        console.log("Assembling Layout...");
+        assembleFullLayout();
+
         console.log("Initializing App...");
         initApp();
         console.log("Initializing Logic...");
@@ -28,6 +32,7 @@ const init = () => {
                 setTimeout(() => splash.remove(), 600);
             }
             document.body.classList.add('ready');
+            window.dispatchEvent(new Event('resize'));
         }, 100);
     } catch (err) {
         console.error("Initialization failed:", err);

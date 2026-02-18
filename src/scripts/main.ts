@@ -4,7 +4,7 @@ import {
     setSelecting, setResizing,
     setRotating,
     setSelectedIndices, history, redoStack, currentLang,
-    workspace, selectionInfo, selectionBox,
+    workspace, selectionBox,
     sidePanel, lastBaseColor, setAlpha,
     container, canvas, selectionCanvas, setWorkspaceScale, customColors,
     favoriteColors, setFavoriteColors, setExportQuality, setExportDpi, setExportFormat, setExportAction, setExportClipOutOfBounds, setViewClipOutOfBounds, setExportScale, setExportMargin, setExportPreset, CANVAS_MARGIN
@@ -23,7 +23,7 @@ import {
     recenterCanvas, resizeCanvas, autoAdjustCanvas
 } from '@/scripts/workspace';
 import { renderUIComponents, updateGlobalReferences, createIcons, updateLanguage, i18n } from '@/scripts/data';
-import { updateSelectedBounds, getSelectedDataBounds, syncControlsWithSelection, updateTransformPanelState } from '@/scripts/ui_updates';
+import { updateSelectedBounds, getSelectedDataBounds, syncControlsWithSelection, updateTransformPanelState, updateSelectionInfo } from '@/scripts/ui_updates';
 
 
 
@@ -49,6 +49,7 @@ export function initAppLogic() {
     setMode('draw');
     recenterCanvas();
     updateTransformPanelState();
+    updateSelectionInfo();
 
     attachEventListeners();
     attachDynamicListeners();
@@ -343,11 +344,13 @@ function attachEventListeners() {
 
 
 
-    document.getElementById('recenterBtnTop')?.addEventListener('click', () => {
+    document.getElementById('centerCanvasBtn')?.addEventListener('click', () => {
         autoAdjustCanvas();
     });
 
-
+    window.addEventListener('resize', () => {
+        updateWorkspaceLayout();
+    });
 }
 
 function attachDynamicListeners() {
@@ -1802,8 +1805,8 @@ function selectStrokes(indices: number[], save = true) {
     if (save) saveState(); setSelectedIndices(indices);
 
     updateTransformPanelState();
+    updateSelectionInfo();
 
-    if (selectionInfo) { selectionInfo.innerText = `Trazos Seleccionados: ${indices.length}`; selectionInfo.style.display = indices.length > 0 ? 'block' : 'none'; }
     updateSelectedBounds(); drawSelectionHighlights(); syncControlsWithSelection();
     updateStrokeStyles();
 }
@@ -1813,7 +1816,7 @@ function deselectStroke(save = true) {
     if (save) saveState(); setSelectedIndices([]);
 
     updateTransformPanelState();
+    updateSelectionInfo();
 
-    if (selectionInfo) selectionInfo.style.display = 'none';
     updateSelectedBounds(); drawSelectionHighlights();
 }

@@ -381,18 +381,16 @@ export class AdvancedStrokeRenderer {
     private calculateWidthFactor(progress: number, strokeType: string): number {
         switch (strokeType) {
             case 'brush':
-                // Organic variation
-                return 0.3 + 0.7 * Math.sin(progress * Math.PI);
             case 'pen':
-                // Slight taper at ends
-                return 0.7 + 0.3 * Math.sin(progress * Math.PI);
+            case 'natural':
+                // Using sin^2 ensures an organic taper where the average weight 
+                // is exactly halfway between min and max (Avg = 0.5)
+                return Math.pow(Math.sin(progress * Math.PI), 2);
             case 'marker':
             case 'fine':
-                // Constant width
-                return 1;
             default:
-                // Natural variation
-                return 0.5 + 0.5 * Math.sin(progress * Math.PI);
+                // Constant technical width
+                return 1.0;
         }
     }
 

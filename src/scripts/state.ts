@@ -25,7 +25,7 @@ export interface HistoryItem {
 }
 
 // Global State
-export let currentThickness = 2.8;
+export let currentThickness = 2.5;
 export let currentAlpha = 1.0;
 export let currentMode = 'draw';
 export let currentStrokeType = 'natural';

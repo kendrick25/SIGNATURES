@@ -3,7 +3,7 @@ import {
     sctx, selectionCanvas, setStrokeType, ratio, setClipboardStrokes, canvas, container, CANVAS_MARGIN,
     setExportClipOutOfBounds, setUniform, setSmoothing, setColorQuality, ctx
 } from '@/scripts/state';
-import { updateSelectedBounds, syncControlsWithSelection, updateTransformPanelState } from '@/scripts/ui_updates';
+import { updateSelectedBounds, syncControlsWithSelection, updateTransformPanelState, updateSelectionInfo } from '@/scripts/ui_updates';
 import { i18n, createIcons } from '@/scripts/data';
 import { currentCanvasBorderStyle, currentRadiusUnit, updateExportDpi, updateExportQuality } from '@/scripts/main';
 import { AdvancedStrokeRenderer } from '@/scripts/advanced-renderer';
@@ -54,6 +54,7 @@ export function undo() {
         updateTransformPanelState();
         updateHistoryButtons();
         updateStrokePreview();
+        updateSelectionInfo();
     }
 }
 
@@ -74,6 +75,7 @@ export function redo() {
         updateTransformPanelState();
         updateHistoryButtons();
         updateStrokePreview();
+        updateSelectionInfo();
     }
 }
 
@@ -120,24 +122,19 @@ function getThicknessRange(type: string, baseThickness: number) {
         return { min: baseThickness, max: baseThickness };
     }
 
-    // Dramatically different ranges for each type
+    // Calibrated ranges to maintain a perfect 1.0 average perceived weight
     switch (type) {
         case 'marker':
-            // Almost uniform, technical pen
-            return { min: baseThickness * 0.98, max: baseThickness * 1.0 };
+            return { min: baseThickness * 0.9, max: baseThickness * 1.1 };
         case 'pen':
-            // Moderate variation, like ballpoint
-            return { min: baseThickness * 0.5, max: baseThickness * 1.3 };
+            return { min: baseThickness * 0.6, max: baseThickness * 1.4 };
         case 'brush':
-            // Extreme variation, organic and expressive
-            return { min: baseThickness * 0.1, max: baseThickness * 2.8 };
+            return { min: baseThickness * 0.2, max: baseThickness * 1.8 };
         case 'fine':
-            // Ultra-consistent technical pen
-            return { min: baseThickness * 0.99, max: baseThickness * 1.0 };
+            return { min: baseThickness * 0.95, max: baseThickness * 1.05 };
         case 'natural':
         default:
-            // Natural handwriting variation
-            return { min: baseThickness * 0.4, max: baseThickness * 1.6 };
+            return { min: baseThickness * 0.5, max: baseThickness * 1.5 };
     }
 }
 
@@ -1398,6 +1395,7 @@ export function pasteSelection() {
     drawSelectionHighlights();
     syncControlsWithSelection();
     updateTransformPanelState();
+    updateSelectionInfo();
     updateHintVisibility();
 
     showToast(i18n[State.currentLang as keyof typeof i18n].toastStrokesPasted, "#6366f1");
@@ -1414,6 +1412,7 @@ export function deleteSelection() {
     updateSelectedBounds();
     drawSelectionHighlights();
     updateTransformPanelState();
+    updateSelectionInfo();
     updateHintVisibility();
 }
 

@@ -121,3 +121,16 @@ export function updateTransformPanelState() {
     transformPanel.style.opacity = hasSelection ? '1' : '0.4';
     transformPanel.style.pointerEvents = hasSelection ? 'auto' : 'none';
 }
+
+export function updateSelectionInfo() {
+    const el = document.getElementById('selectionInfo');
+    if (!el) return;
+
+    const count = State.selectedStrokeIndices.length;
+    if (count > 0) {
+        el.innerText = `Trazos Seleccionados: ${count}`;
+        el.style.display = 'block';
+    } else {
+        el.style.display = 'none';
+    }
+}
