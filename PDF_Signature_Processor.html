@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Signature Processor | INSLAB Premium</title>
+    <!-- pdf-lib library -->
+    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image:
+                radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(6, 182, 212, 0.1) 0%, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            height: 100vh;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 12px;
+            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        .content-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+            min-height: 0;
+            margin-bottom: 1.5rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-dim);
+        }
+
+        .console {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1.5rem;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            scroll-behavior: smooth;
+        }
+
+        .console::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .console::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .console::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            display: flex;
+            gap: 1rem;
+            animation: fadeInBlur 0.3s ease-out forwards;
+        }
+
+        .log-time {
+            color: rgba(255, 255, 255, 0.3);
+            white-space: nowrap;
+        }
+
+        .log-tag {
+            font-weight: 600;
+            min-width: 70px;
+            text-align: right;
+        }
+
+        .tag-info {
+            color: var(--accent);
+        }
+
+        .tag-load {
+            color: var(--primary);
+        }
+
+        .tag-done {
+            color: var(--success);
+        }
+
+        .tag-warn {
+            color: var(--warning);
+        }
+
+        .tag-error {
+            color: var(--error);
+        }
+
+        .tag-test {
+            color: #a855f7;
+        }
+
+        .log-msg {
+            color: var(--text-main);
+            word-break: break-all;
+        }
+
+        .footer-controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        button {
+            padding: 0.8rem 1.5rem;
+            border-radius: 14px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: 1px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .btn-ghost {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid var(--glass-border);
+        }
+
+        .btn-ghost:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInBlur {
+            from {
+                opacity: 0;
+                filter: blur(4px);
+                transform: translateX(-5px);
+            }
+
+            to {
+                opacity: 1;
+                filter: blur(0);
+                transform: translateX(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.2rem;
+            }
+
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Custom scrollbar for log container */
+        .console {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="main-container">
+        <header>
+            <div class="logo-container">
+                <div class="logo-badge">INSLAB</div>
+                <h1>PDF Signature Processor</h1>
+            </div>
+            <div class="status-badge">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Ready for Requests</span>
+            </div>
+        </header>
+
+        <div class="content-grid">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Processing Logs</div>
+                    <div style="font-size: 0.7rem; color: rgba(255,255,255,0.2)">Auto-scrolling active</div>
+                </div>
+                <div class="console" id="logConsole">
+                    <!-- Logs will appear here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-controls">
+            <button class="btn-ghost" onclick="clearLogs()">
+                <span>Clear Logs</span>
+            </button>
+            <button class="btn-primary" id="testBtn">
+                <span>Run Test Batch</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ================================================================
+        // INITIALIZATION & WEB3 SECURITY
+        // ================================================================
+
+        // Block MetaMask warnings and identify environment
+        if (window.ethereum && window.ethereum.isMetaMask) {
+            console.log('%c[INSLAB] MetaMask Detected', 'color: #6366f1; font-weight: bold;');
+        }
+
+        const { PDFDocument } = PDFLib;
+
+        // Dummy data for testing (Replace with actual data if needed or leave as is)
+        const TEST_PDF_CONTENT = 'JVBERi0xLjcNCiW1tbW1DQoxIDAgb2JqDQo8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFIvTGFuZyhlbikgL01ldGFkYXRhIDIyIDAgUi9OYW1lcyAyNSAwIFIvVmlld2VyUHJlZmVyZW5jZXMgMjYgMCBSPj4NCmVuZG9iag0KMiAwIG9iag0KPDwvVHlwZS9QYWdlcy9Db3VudCAxL0tpZHNbIDQgMCBSXSA+Pg0KZW5kb2JqDQozIDAgb2JqDQo8PC9UaXRsZShQdXJjaGFzZSBPcmRlciBUZW1wbGF0ZSB3aXRoIFZlbmRvciBMaXN0KSAvQXV0aG9yKFZlcnRleDQyLmNvbSkgL1N1YmplY3QoKSAvS2V5d29yZHMoKSAvQ3JlYXRpb25EYXRlKEQ6MjAyNjAyMTYxMzQ2MDktMDgnMDAnKSAvTW9kRGF0ZShEOjIwMjYwMjE2MTM0NjA5LTA4JzAwJykgL1Byb2R1Y2VyKCkgL0NyZWF0b3IoKSA+Pg0KZW5kb2JqDQo0IDAgb2JqDQo8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL1Jlc291cmNlczw8L0V4dEdTdGF0ZTw8L0dTNSA1IDAgUi9HUzkgOSAwIFI+Pi9Gb250PDwvRjEgNyAwIFIvRjIgMTAgMCBSPj4vWE9iamVjdDw8L0ltYWdlMTIgMTIgMCBSL0ltYWdlMTQgMTQgMCBSL0ltYWdlMTYgMTYgMCBSPj4vUHJvY1NldFsvUERGL1RleHQvSW1hZ2VCL0ltYWdlQy9JbWFnZUldID4+L01lZGlhQm94WyAwIDAgNjEyIDc5Ml0gL0NvbnRlbnRzIDYgMCBSL0dyb3VwPDwvVHlwZS9Hcm91cC9TL1RyYW5zcGFyZW5jeS9DUy9EZXZpY2VSR0I+Pi9UYWJzL1M+Pg0KZW5kb2JqDQo1IDAgb2JqDQo8PC9UeXBlL0V4dEdTdGF0ZS9CTS9Ob3JtYWwvY2EgMT4+DQplbmRvYmoNCjYgMCBvYmoNCjw8L0ZpbHRlci9GbGF0ZURlY29kZS9MZW5ndGggMzA0MT4+DQpzdHJlYW0NCnicxVvLctzGFd2ziv+A5Yyr2EK/0dlJIqUwRZOySDtVcWVBU2NZjkQ6lOxU5Q+zyMpfkGXW/oGccxuYAQaPGUqQUyrODNAXfc999H10Q4+e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s2nydhLN0YPB55LEOz0Q7uQUi8HOmMX761fSohS899Pd/aA8UL6ppJmqPB1KB2T6bXlGieaQJ6Sm3nQD5+er+xUWTuL5s1kwB+P31X9vpBnJwfzmbkswtMHRyUpxXjC72BdsB9EMQVHrkv/lhYKlvqXQUh15dlv4lMjwYVXbijUUf+brpzzIlKjxVqJIjiVCkDvr/vqoVAUdR5aCsagcTzoCGnbfQi13BWYe6T5zA6yPTt9dv15B1OO7op43IfSAhpnWS1RH4WqdbDMZbVuz12Pe4i6ZyHjJar89Q4uL23DhJorh/8SR/38A+0T+5yE64Wb+fJcz55HuM615Qz3v/wD7vrBhDQplbmRzdHJlYW0NCmVuZG9iag0KNyAwIG9iag0KPDwvVHlwZS9Gb250L1N1YnR5cGUvVHJ1ZVR5cGUvTmFtZS9GMS9CYXNlRm9udC9CQ0RFRUUrQXJpYWwtQm9sZE1UL0VuY29kaW5nL1dpbkFuc2lFbmNvZGluZy9Gb250RGVzY3JpcHRvciA4IDAgUi9GaXJzdENoYXIgMzIvTGFzdENoYXIgMjExL1dpZHRocyAxOCAwIFI+Pg0KZW5kb2JqDQo4IDAgb2JqDQo8PC9UeXBlL0ZvbnREZXNjcmlwdG9yL0ZvbnROYW1lL0JDREVFRStBcmlhbC1Cb2xkTVQvRmxhZ3MgMzIvSXRhbGljQW5nbGUgMC9Bc2NlbnQgOTA1L0Rlc2NlbnQgLTIxMC9DYXBIZWlnaHQgNzI4L0F2Z1dpZHRoIDQ3OS9NYXhXaWR0aCAyNjI4L0ZvbnRXZWlnaHQgNzAwL1hIZWlnaHQgMjUwL0xlYWRpbmcgMzMvU3RlbVYgNDcvRm9udEJCb3hbIC02MjggLTIxMCAyMDAwIDcyOF0gL0ZvbnRGaWxlMiAxOSAwIFI+Pg0KZW5kb2JqDQo5IDAgb2JqDQo8PC9UeXBlL0V4dEdTdGF0ZS9CTS9Ob3JtYWwvQ0EgMT4+DQplbmRvYmoNCjEwIDAgb2JqDQo8PC9UeXBlL0ZvbnQvU3VidHlwZS9UcnVlVHlwZS9OYW1lL0YyL0Jhc2VGb250L0JDREZFRStBcmlhbE1UL0VuY29kaW5nL1dpbkFuc2lFbmNvZGluZy9Gb250RGVzY3JpcHRvciAxMSAwIFIvRmlyc3RDaGFyIDMyL0xhc3RDaGFyIDI0My9XaWR0aHMgMjAgMCBSPj4NCmVuZG9iag0KMTEgMCBvYmoNCjw8L1R5cGUvRm9udERlc2NyaXB0b3IvRm9udE5hbWUvQkNERkVFK0FyaWFsTVQvRmxhZ3MgMzIvSXRhbGljQW5nbGUgMC9Bc2NlbnQgOTA1L0Rlc2NlbnQgLTIxMC9DYXBIZWlnaHQgNzI4L0F2Z1dpZHRoIDQ0MS9NYXhXaWR0aCAyNjY1L0ZvbnRXZWlnaHQgNDAwL1hIZWlnaHQgMjUwL0xlYWRpbmcgMzMvU3RlbVYgNDQvRm9udEJCb3hbIC02NjUgLTIxMCAyMDAwIDcyOF0gL0ZvbnRGaWxlMiAxMSAwIFI+Pg0KZW5kb2Jq';
+
+        const TEST_SIGNATURE_IMAGES = {
+            Firma1: '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',
+            Firma2: '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',
+        };
+
+        const TEST_SIGNATURES = [
+            { pageNumber: 1, imageKey: 'Firma1', size: 'width:150;height:45', position: 'x:50;y:680' },
+            { pageNumber: 1, imageKey: 'Firma2', size: 'width:150;height:45', position: 'x:50;y:580' }
+        ];
+
+        // ================= LOGGING ENGINE =================
+        const logConsole = document.getElementById('logConsole');
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.getElementById('statusDot');
+
+        function log(tag, msg, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, fractionalSecondDigits: 2 });
+
+            entry.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="log-tag tag-${tag.toLowerCase()}">[${tag}]</span>
+                <span class="log-msg">${msg}</span>
+            `;
+
+            logConsole.appendChild(entry);
+            logConsole.scrollTop = logConsole.scrollHeight;
+        }
+
+        function clearLogs() {
+            logConsole.innerHTML = '';
+            log('INFO', 'Log console cleared');
+        }
+
+        function setStatus(text, colorClass = 'success') {
+            statusText.textContent = text;
+            const colors = {
+                success: '#10b981',
+                warning: '#f59e0b',
+                error: '#ef4444',
+                busy: '#6366f1'
+            };
+            statusDot.style.background = colors[colorClass] || colors.success;
+            statusDot.style.boxShadow = `0 0 8px ${colors[colorClass] || colors.success}`;
+        }
+
+        // ================= CORE UTILS =================
+        function parsePropString(str) {
+            if (!str) return {};
+            if (typeof str === 'object') return str;
+
+            const result = {};
+            // Handles width:150;height:45 OR "width:150;height:45"
+            str.replace(/"/g, '').split(';').forEach(pair => {
+                const p = pair.split(':');
+                if (p.length >= 2) {
+                    const key = p[0].toLowerCase().trim();
+                    const val = parseFloat(p[1]);
+                    if (!isNaN(val)) result[key] = val;
+                }
+            });
+            return result;
+        }
+
+        function base64ToArrayBuffer(base64) {
+            try {
+                const clean = base64.replace(/[^A-Za-z0-9+\/=]/g, '');
+                const binary = atob(clean);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                return bytes.buffer;
+            } catch (e) {
+                log('ERROR', 'Failed to decode base64 string');
+                throw e;
+            }
+        }
+
+        function arrayBufferToBase64(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            const chunk = 0x8000;
+            for (let i = 0; i < bytes.length; i += chunk) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+            }
+            return btoa(binary);
+        }
+
+        function triggerDownload(data, filename) {
+            const blob = new Blob([data], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            log('DONE', `Download triggered: ${filename}`);
+        }
+
+        // ================= PDF PROCESSING ENGINE =================
+        async function processPDFRequest(req) {
+            const startTime = performance.now();
+            setStatus('Processing...', 'busy');
+
+            try {
+                // VALIDATION
+                if (!req) throw new Error('Request payload is empty');
+                if (!req.pdfContent) throw new Error('Missing pdfContent (base64 string)');
+                if (!req.signatureImages || Object.keys(req.signatureImages).length === 0) throw new Error('No signature images provided');
+                if (!req.signatures || req.signatures.length === 0) throw new Error('No signature placement data provided');
+
+                log('LOAD', 'Parsing PDF document structure...');
+                const pdfDoc = await PDFDocument.load(base64ToArrayBuffer(req.pdfContent));
+                const totalPages = pdfDoc.getPageCount();
+                log('LOAD', `Successfully loaded PDF with ${totalPages} pages`);
+
+                // EMBED IMAGES
+                log('INFO', 'Embedding signature images into PDF resources...');
+                const embeddedImages = {};
+                for (const key of Object.keys(req.signatureImages)) {
+                    const img64 = req.signatureImages[key];
+                    if (!img64) {
+                        log('WARN', `Skipping empty image for key: ${key}`);
+                        continue;
+                    }
+
+                    try {
+                        const bytes = base64ToArrayBuffer(img64);
+                        // Assumption: Signatures are PNG (transparent)
+                        embeddedImages[key] = await pdfDoc.embedPng(bytes);
+                        log('INFO', `Resource embedded: ${key}`);
+                    } catch (e) {
+                        log('WARN', `Failed to embed image "${key}": ${e.message}`);
+                    }
+                }
+
+                // PLACE SIGNATURES
+                log('INFO', 'Mapping signature coordinates to pages...');
+                let signaturesPlaced = 0;
+
+                for (const sig of req.signatures) {
+                    if (!sig) continue;
+
+                    const pageNum = parseInt(sig.pageNumber);
+                    if (isNaN(pageNum) || pageNum < 1 || pageNum > totalPages) {
+                        log('WARN', `Invalid page number: ${sig.pageNumber}. Skipping signature.`);
+                        continue;
+                    }
+
+                    const img = embeddedImages[sig.imageKey];
+                    if (!img) {
+                        log('WARN', `Target image "${sig.imageKey}" not found in resources.`);
+                        continue;
+                    }
+
+                    const page = pdfDoc.getPage(pageNum - 1);
+                    const { width: pW, height: pH } = page.getSize();
+
+                    // Parse properties (handle both string and object)
+                    const size = parsePropString(sig.size);
+                    const pos = parsePropString(sig.position);
+
+                    const w = size.width || 120;
+                    const h = size.height || size.heigth || 40; // handle typo
+                    const x = pos.x || 0;
+                    const y = pos.y || 0;
+
+                    // Coordinate Mapping: 
+                    // Browser/Client uses Top-Left (0,0)
+                    // PDF-Lib uses Bottom-Left (0,0)
+                    // Formula: pdf_y = page_height - topleft_y - item_height
+                    const pdfX = x;
+                    const pdfY = pH - y - h;
+
+                    page.drawImage(img, {
+                        x: pdfX,
+                        y: pdfY,
+                        width: w,
+                        height: h
+                    });
+
+                    log('DONE', `Placed "${sig.imageKey}" on page ${pageNum} at [${Math.round(x)}, ${Math.round(y)}]`);
+                    signaturesPlaced++;
+                }
+
+                log('INFO', 'Finalizing document serializing...');
+                const finalBytes = await pdfDoc.save();
+                const base64Pdf = arrayBufferToBase64(finalBytes);
+                const endTime = performance.now();
+                const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+                log('DONE', `Processing complete in ${duration}s. Total signatures: ${signaturesPlaced}`);
+                setStatus('Success', 'success');
+
+                // Auto-Download if requested
+                if (req.debugDownload) {
+                    const downloadName = req.documentName || 'signed_document.pdf';
+                    triggerDownload(finalBytes, downloadName);
+                }
+
+                return {
+                    status: 'success',
+                    fileName: req.documentName,
+                    signaturesCount: signaturesPlaced,
+                    pdfContent: base64Pdf,
+                    processingTime: duration
+                };
+
+            } catch (err) {
+                log('ERROR', err.message);
+                setStatus('Error', 'error');
+                return { status: 'error', message: err.message };
+            }
+        }
+
+        // ================= INTERFACE & EVENTS =================
+
+        // Handle postMessage (Standard for Iframe integration)
+        window.addEventListener('message', async (event) => {
+            // Check for method: 'POST' in the payload
+            if (event.data && event.data.method === 'POST') {
+                log('INFO', 'Request received via Message Channel');
+                const result = await processPDFRequest(event.data.payload);
+
+                // Reply to parent
+                if (window.parent) {
+                    window.parent.postMessage({
+                        type: 'INSLAB_PDF_RESPONSE',
+                        payload: result
+                    }, '*');
+                }
+            }
+        });
+
+        // Test Button Manual Trigger
+        document.getElementById('testBtn').addEventListener('click', () => {
+            log('TEST', 'Starting test batch simulation...');
+            processPDFRequest({
+                documentName: 'INSLAB_LOCAL_TEST.pdf',
+                pdfContent: TEST_PDF_CONTENT,
+                signatureImages: TEST_SIGNATURE_IMAGES,
+                signatures: TEST_SIGNATURES,
+                debugDownload: true
+            });
+        });
+
+        // Initial entry
+        log('INFO', 'Application strictly waiting for JSON payload...');
+    </script>
+</body>
+
+</html>
