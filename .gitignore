@@ -39,4 +39,6 @@ yarn-error.log*
 # Original backups (from previous structure)
 Copy.html
 FIRMAS_OLD.html
+FIRMAS.html
 FIRMAS_BACKUP.html
+backup_old/*
