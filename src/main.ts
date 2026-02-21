@@ -2,6 +2,7 @@ import '@/styles/style.scss';
 import { assembleFullLayout } from '@/layout/main-layout';
 import { initApp } from '@/scripts/init';
 import { initAppLogic } from '@/scripts/main';
+import { initPageRouter } from '@/scripts/router';
 
 // Initialize the application
 const init = () => {
@@ -9,11 +10,17 @@ const init = () => {
         console.log("Assembling Layout...");
         assembleFullLayout();
 
+        console.log("Initializing Router...");
+        const pageRouter = initPageRouter();
+
         console.log("Initializing App...");
         initApp();
         console.log("Initializing Logic...");
         initAppLogic();
         console.log("App Ready.");
+
+        // Attach navbar event listeners
+        attachNavbarListeners(pageRouter);
 
         // Wait for the signature animation loop to complete for a premium feel
         setTimeout(() => {
@@ -57,6 +64,21 @@ const init = () => {
         }
     }
 };
+
+function attachNavbarListeners(pageRouter: any) {
+    const pageButtons = document.querySelectorAll('.navbar-page-btn');
+
+    pageButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const page = btn.getAttribute('data-page');
+            if (page === 'converter') {
+                pageRouter.navigateTo('/Convertir');
+            } else if (page === 'workspace') {
+                pageRouter.navigateTo('/Workspace');
+            }
+        });
+    });
+}
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

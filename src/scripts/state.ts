@@ -64,6 +64,7 @@ export let isMoving = false;
 export let isResizing = false;
 export let isRotating = false;
 export let isPanning = false;
+export let workspaceActive = true;
 
 export let workspacePan = { x: 0, y: 0 };
 export let workspaceScale = 1.0;
@@ -103,7 +104,8 @@ export const State = {
     get isUniform() { return isUniform; },
     get smoothing() { return smoothing; },
     get colorQuality() { return colorQuality; },
-    get showGrid() { return showGrid; }
+    get showGrid() { return showGrid; },
+    get workspaceActive() { return workspaceActive; }
 };
 
 export const setThickness = (val: number) => { currentThickness = val; };
@@ -152,6 +154,7 @@ export const setExportTarget = (val: { format: string, action: 'download' | 'cop
 export const setExportScale = (val: number) => { exportScale = val; };
 export const setExportMargin = (val: number) => { exportMargin = val; };
 export const setExportPreset = (val: string) => { exportPreset = val; };
+export const setWorkspaceActive = (val: boolean) => { workspaceActive = val; };
 
 export const setUniform = (val: boolean) => { isUniform = val; };
 export const setSmoothing = (val: number) => { smoothing = val; };

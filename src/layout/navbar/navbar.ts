@@ -12,6 +12,14 @@ export const NavbarHTML = `
         </div>
 
         <div class="header-right">
+            <div class="navbar-tools-group">
+                <button class="navbar-tool-btn navbar-page-btn active" id="workspaceButton" data-page="workspace" title="Workspace">
+                    <i data-lucide="layout-grid"></i>
+                </button>
+                <button class="navbar-tool-btn navbar-page-btn" id="converterButton" data-page="converter" title="Convertir imágenes">
+                    <i data-lucide="image"></i>
+                </button>
+            </div>
             <button class="navbar-tool-btn" id="settingsToggle" title="Configuración">
                 <i data-lucide="settings"></i>
             </button>

@@ -1,5 +1,5 @@
 export const ControlsHTML = `
-    <div class="header-sub-row">
+    <div class="header-sub-row controls-header">
         <button class="header-tool-btn" id="workspaceToggle" title="Mostrar/Ocultar Panel de Control">
             <i data-lucide="layout-grid"></i>
         </button>

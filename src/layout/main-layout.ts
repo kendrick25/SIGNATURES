@@ -5,6 +5,7 @@ import { PanelHTML } from './panel/panel';
 import { WorkspaceHTML } from './workspace/workspace';
 import { ExportModalHTML } from './modal/export-modal';
 import { OverlaysHTML } from './shared/overlays';
+import { ConverterHTML } from './converter/converter';
 
 export function assembleFullLayout() {
     const appHTML = `
@@ -16,9 +17,13 @@ export function assembleFullLayout() {
                 ${ControlsHTML}
             </header>
 
-            <div class="app-main-layout">
-                ${PanelHTML}
-                ${WorkspaceHTML}
+            <div class="main-content-area">
+                <div class="app-main-layout">
+                    ${PanelHTML}
+                    ${WorkspaceHTML}
+                </div>
+
+                ${ConverterHTML}
             </div>
         </div>
 

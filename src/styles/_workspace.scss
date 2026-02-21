@@ -196,6 +196,16 @@
     gap: 2px;
 }
 
+.main-content-area {
+    flex: 1;
+    display: flex;
+    width: 100%;
+    height: calc(100vh - 100px);
+    overflow: hidden;
+    position: relative;
+    background-color: var(--bg-dark);
+}
+
 .app-main-layout {
     flex: 1;
     display: flex;

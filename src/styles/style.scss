@@ -7,6 +7,7 @@
 @use 'indicator';
 @use 'reorder';
 @use 'modal';
+@use 'converter';
 
 * {
     margin: 0;
@@ -17,6 +18,35 @@
 
 .hidden {
     display: none !important;
+}
+
+/* Custom Scrollbar Styles - Global */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--glass-border);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+    background-clip: content-box;
+}
+
+/* Firefox compatibility */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--glass-border) transparent;
 }
 
 body {
@@ -43,6 +73,7 @@ body {
     margin: 0;
     animation: fadeIn 0.8s ease-out;
 }
+
 
 @keyframes fadeIn {
     from {

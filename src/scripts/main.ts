@@ -1393,6 +1393,7 @@ function rgbToHsb(r: number, g: number, b: number) {
 }
 
 function handleWheel(e: WheelEvent) {
+    if (!State.workspaceActive) return;
     if (!workspace || !canvas) return;
     e.preventDefault();
 
@@ -1438,6 +1439,7 @@ let transformPivot = { x: 0, y: 0, minX: 0, minY: 0, width: 0, height: 0 };
 let modeBeforeMiddleClick: string | null = null;
 
 function updateCursor(e: PointerEvent) {
+    if (!State.workspaceActive) return;
     // 1. Priority: Active drag states (locked cursors)
     if (State.isPanning) { document.body.style.cursor = 'grabbing'; return; }
     if (State.isMoving) { document.body.style.cursor = 'move'; return; }
@@ -1477,6 +1479,7 @@ function updateCursor(e: PointerEvent) {
 }
 
 function handlePointerDown(e: PointerEvent) {
+    if (!State.workspaceActive) return;
     const target = e.target as HTMLElement;
     if (target.closest('.side-panel') || target.closest('.app-header')) return;
 
@@ -1573,6 +1576,7 @@ function handlePointerDown(e: PointerEvent) {
 }
 
 function handlePointerMove(e: PointerEvent) {
+    if (!State.workspaceActive) return;
     updateCursor(e);
     if (State.isPanning) {
         workspacePan.x += (e.clientX - panStart.x); workspacePan.y += (e.clientY - panStart.y);
@@ -1625,6 +1629,7 @@ function handlePointerMove(e: PointerEvent) {
 }
 
 function handlePointerUp(e: PointerEvent) {
+    if (!State.workspaceActive) return;
     if (State.isPanning && modeBeforeMiddleClick) { setMode(modeBeforeMiddleClick); modeBeforeMiddleClick = null; }
     if (State.isSelecting) {
         setSelecting(false);
