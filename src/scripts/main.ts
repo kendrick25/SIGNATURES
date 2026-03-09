@@ -7,7 +7,8 @@ import {
     workspace, selectionBox,
     sidePanel, lastBaseColor, setAlpha,
     container, canvas, selectionCanvas, colorLayer, setWorkspaceScale, customColors,
-    favoriteColors, setFavoriteColors, setExportQuality, setExportDpi, setExportFormat, setExportAction, setExportClipOutOfBounds, setViewClipOutOfBounds, setShowGrid, setExportScale, setExportMargin, setExportPreset, CANVAS_MARGIN
+    favoriteColors, setFavoriteColors, setExportQuality, setExportDpi, setExportFormat, setExportAction, setExportClipOutOfBounds, setViewClipOutOfBounds, setShowGrid, setExportScale, setExportMargin, setExportPreset, CANVAS_MARGIN, setWorkspaceActive,
+    setCanvasBorderStyle, setCanvasBorderColor, setBorderOpacity, setBgOpacity, setRadiusUnit, setBorderOffset
 } from '@/scripts/state';
 import {
     saveState, undo, redo, updateThickness, applyStrokeType,
@@ -24,15 +25,12 @@ import {
 } from '@/scripts/workspace';
 import { renderUIComponents, updateGlobalReferences, createIcons, updateLanguage, i18n } from '@/scripts/data';
 import { updateSelectedBounds, getSelectedDataBounds, syncControlsWithSelection, updateTransformPanelState, updateSelectionInfo } from '@/scripts/ui_updates';
+import { pageRouter } from '@/scripts/router';
 
 
 
 // --- Initialization ---
 
-export let currentCanvasBorderStyle = 'none';
-export let currentRadiusUnit = 'px';
-let bgOpacity = 1.0;
-let borderOpacity = 1.0;
 let activePickerId: string | null = null;
 let currentPickerColor = { h: 0, s: 100, v: 100 };
 
@@ -45,7 +43,7 @@ export function initAppLogic() {
     updateHistoryButtons();
     updateCanvasBorder();
     if (container && !container.dataset.bgColor) {
-        container.dataset.bgColor = window.getComputedStyle(container).backgroundColor || '#0f172a';
+        container.dataset.bgColor = 'transparent';
     }
     updateCanvasBackground();
     updateWorkspaceView();
@@ -270,6 +268,12 @@ function attachEventListeners() {
             const last = data[data.length - 1] as any;
             last.strokeType = State.currentStrokeType;
             last.isUniform = State.isUniform;
+            // Ensure color is persisted in both standard and custom properties
+            last.penColor = signaturePad.penColor;
+            last.color = signaturePad.penColor;
+
+            // Re-render with high-quality Advanced Renderer
+            safeFromData(data);
         }
     });
 
@@ -387,8 +391,13 @@ function attachDynamicListeners() {
                 }
             } else if (picker.id === 'canvasBorderColorPicker') {
                 if (container) {
-                    container.style.borderColor = color;
+                    setCanvasBorderColor(color);
                     updateCanvasBorder();
+                }
+            } else if (picker.id === 'converterColorPicker') {
+                const converter = pageRouter.getConverterInstance();
+                if (converter) {
+                    converter.updateFilterColor(color);
                 }
             }
 
@@ -419,7 +428,7 @@ function attachDynamicListeners() {
             document.querySelectorAll('#borderTypePresets .preset-btn').forEach(b => b.classList.remove('active'));
             borderTypeBtn.classList.add('active');
             if (container) {
-                currentCanvasBorderStyle = borderTypeBtn.dataset.borderType!;
+                setCanvasBorderStyle(borderTypeBtn.dataset.borderType!);
                 updateCanvasBorder();
             }
         }
@@ -428,10 +437,10 @@ function attachDynamicListeners() {
         if (radiusUnitBtn) {
             document.querySelectorAll('#radiusUnitToggle .unit-btn').forEach(b => b.classList.remove('active'));
             radiusUnitBtn.classList.add('active');
-            currentRadiusUnit = radiusUnitBtn.dataset.unit || 'px';
+            setRadiusUnit(radiusUnitBtn.dataset.unit || 'px');
             const radiusSlider = document.getElementById('radiusSlider') as HTMLInputElement;
             if (radiusSlider) {
-                const val = radiusSlider.value + currentRadiusUnit;
+                const val = radiusSlider.value + State.currentRadiusUnit;
                 const radiusVal = document.getElementById('radiusVal');
                 if (radiusVal) radiusVal.textContent = val;
                 updateCanvasBorder();
@@ -478,6 +487,7 @@ function attachDynamicListeners() {
 
         if (target.closest('#closeExportModal')) {
             document.getElementById('exportModal')?.classList.add('hidden');
+            setWorkspaceActive(true);
         }
 
         if (target.closest('#finalExportBtn')) {
@@ -485,6 +495,7 @@ function attachDynamicListeners() {
             const action = State.exportAction;
 
             document.getElementById('exportModal')?.classList.add('hidden');
+            setWorkspaceActive(true);
 
             if (action === 'download') {
                 if (format === 'PNG') downloadPng();
@@ -643,27 +654,37 @@ function attachControlListeners() {
     setupScrubbing('zoomScrubArea', () => State.workspaceScale * 100, (v) => updateZoom(v), 1);
 
     document.getElementById('bgOpacitySlider')?.addEventListener('input', (e: any) => {
-        bgOpacity = parseFloat(e.target.value) / 100;
-        const valEl = document.getElementById('bgOpacityVal');
-        if (valEl) valEl.innerText = e.target.value + '%';
+        const val = e.target.value;
+        setBgOpacity(parseFloat(val) / 100);
         updateCanvasBackground();
+        const bgOpacityVal = document.getElementById('bgOpacityVal');
+        if (bgOpacityVal) bgOpacityVal.textContent = val + '%';
     });
 
     document.getElementById('borderOpacitySlider')?.addEventListener('input', (e: any) => {
-        borderOpacity = parseFloat(e.target.value) / 100;
-        const valEl = document.getElementById('borderOpacityVal');
-        if (valEl) valEl.innerText = e.target.value + '%';
+        const val = e.target.value;
+        setBorderOpacity(parseFloat(val) / 100);
         updateCanvasBorder();
+        const borderOpacityVal = document.getElementById('borderOpacityVal');
+        if (borderOpacityVal) borderOpacityVal.textContent = val + '%';
+    });
+    
+    document.getElementById('borderOffsetSlider')?.addEventListener('input', (e: any) => {
+        const val = e.target.value;
+        setBorderOffset(parseFloat(val));
+        updateCanvasBorder();
+        const borderOffsetVal = document.getElementById('borderOffsetVal');
+        if (borderOffsetVal) borderOffsetVal.textContent = val + 'px';
     });
 
     document.getElementById('radiusSlider')?.addEventListener('input', (e: any) => {
-        const val = e.target.value + currentRadiusUnit;
+        const val = e.target.value;
         if (container) {
-            container.style.borderRadius = val;
+            container.style.borderRadius = val + State.currentRadiusUnit;
             updateCanvasBorder();
         }
         const radiusVal = document.getElementById('radiusVal');
-        if (radiusVal) radiusVal.textContent = val;
+        if (radiusVal) radiusVal.textContent = val + State.currentRadiusUnit;
     });
 
     document.getElementById('borderWidthSlider')?.addEventListener('input', (e: any) => {
@@ -885,9 +906,9 @@ export function updateWorkspaceView() {
 
 function updateCanvasBackground() {
     if (!colorLayer || !container) return;
-    const bgColor = container.dataset.bgColor || '#0f172a';
+    const bgColor = container.dataset.bgColor || 'transparent';
     // If it's hex, convert to rgba. If it's already rgba, we replace the alpha.
-    const finalColor = applyAlpha(bgColor, bgOpacity);
+    const finalColor = applyAlpha(bgColor, State.bgOpacity);
     colorLayer.style.backgroundColor = finalColor;
     // Keep container transparent so we see the premium background through it
     container.style.backgroundColor = 'transparent';
@@ -921,16 +942,30 @@ function hexToRgba(hex: string, alpha: number) {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// --- Resize Handling for SVG Border ---
+const borderResizeObserver = new ResizeObserver(() => {
+    updateCanvasBorder();
+});
+
 function updateCanvasBorder() {
     if (!container) return;
-    const style = currentCanvasBorderStyle;
-    const rawColor = container.style.borderColor || 'rgba(255, 255, 255, 0.08)';
-    const color = applyAlpha(rawColor, borderOpacity);
-    const width = (document.getElementById('borderWidthSlider') as HTMLInputElement)?.value || '1';
-    const radius = (document.getElementById('radiusSlider') as HTMLInputElement)?.value || '0';
-    const dashVal = (document.getElementById('borderDashSlider') as HTMLInputElement)?.value || '4';
-
+    
+    // Connect observer if not already
+    borderResizeObserver.observe(container);
+    
+    const style = State.currentCanvasBorderStyle;
+    const color = applyAlpha(State.currentCanvasBorderColor, State.borderOpacity);
+    const widthRaw = (document.getElementById('borderWidthSlider') as HTMLInputElement)?.value || '1';
+    const radiusRaw = (document.getElementById('radiusSlider') as HTMLInputElement)?.value || '0';
+    const dashRaw = (document.getElementById('borderDashSlider') as HTMLInputElement)?.value || '4';
+    const offsetRaw = (document.getElementById('borderOffsetSlider') as HTMLInputElement)?.value || '0';
+    
+    const w = parseFloat(widthRaw);
+    const dashVal = parseFloat(dashRaw);
+    const offset = parseFloat(offsetRaw);
     const isNone = style === 'none';
+    
+    // UI Updates
     const dashSlider = document.getElementById('borderDashSlider') as HTMLInputElement;
     if (dashSlider) dashSlider.disabled = (style === 'solid' || isNone);
 
@@ -947,39 +982,50 @@ function updateCanvasBorder() {
         borderColorPicker.style.opacity = isNone ? '0.5' : '1';
     }
 
-    const radiusWithUnit = radius + currentRadiusUnit;
+    const radiusWithUnit = radiusRaw + State.currentRadiusUnit;
+    container.style.borderRadius = radiusWithUnit;
 
-    if (style === 'solid' || style === 'none') {
+    if (isNone) {
+        container.style.border = 'none';
         container.style.backgroundImage = 'none';
-        container.style.borderStyle = style;
-        container.style.borderWidth = width + 'px';
-        container.style.borderColor = color;
-        container.style.borderRadius = radiusWithUnit;
+        if (colorLayer) colorLayer.style.backgroundImage = 'none';
         return;
     }
 
-    // Advanced: SVG Border for custom dashed/dotted spacing
-    container.style.borderStyle = 'none';
-    container.style.borderWidth = '0';
+    // We remove the native border to ensure the background/lienzo fills the whole container
+    container.style.border = 'none';
+    container.style.backgroundImage = 'none';
+    
+    let dashArray = 'none';
+    if (style === 'dashed') dashArray = `${dashVal}, ${dashVal * 0.8}`;
+    else if (style === 'dotted') dashArray = `${Math.max(1, w/2)}, ${dashVal}`;
 
-    let dashArray = `${dashVal}, ${dashVal}`;
-    if (style === 'dotted') dashArray = `1, ${dashVal}`;
+    const cw = Math.round(container.offsetWidth);
+    const ch = Math.round(container.offsetHeight);
+    if (cw === 0 || ch === 0) return;
 
-    const radiusPx = currentRadiusUnit === '%' ? (parseFloat(radius) / 100) * Math.min(container.offsetWidth, container.offsetHeight) : parseFloat(radius);
+    const radiusPx = State.currentRadiusUnit === '%' 
+        ? (parseFloat(radiusRaw) / 100) * Math.min(cw, ch) 
+        : parseFloat(radiusRaw);
 
+    // Technique: Draw the stroke perfectly inside the container by insetting the rect
+    // Offset property: increases the inset
+    const inset = (w / 2) + offset;
     const finalSvg = `
-        <svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'>
-            <rect x='${parseFloat(width) / 2}' y='${parseFloat(width) / 2}' 
-                  width='calc(100% - ${width}px)' height='calc(100% - ${width}px)' 
-                  style='fill:none; stroke:${color}; stroke-width:${width}; stroke-dasharray:${dashArray};' 
-                  rx='${radiusPx}' ry='${radiusPx}'/>
+        <svg xmlns='http://www.w3.org/2000/svg' width='${cw}' height='${ch}'>
+            <rect x='${inset}' y='${inset}' width='${Math.max(0, cw - w - (offset * 2))}' height='${Math.max(0, ch - w - (offset * 2))}' 
+                  fill='none' stroke='${color}' stroke-width='${w}' stroke-dasharray='${dashArray}' 
+                  stroke-linecap='${style === 'dotted' ? 'round' : 'square'}'
+                  rx='${Math.max(0, radiusPx - offset)}' ry='${Math.max(0, radiusPx - offset)}'/>
         </svg>
     `.trim().replace(/\n/g, '').replace(/\s+/g, ' ');
 
-    container.style.backgroundImage = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(finalSvg)}")`;
-    container.style.backgroundSize = '100% 100%';
-    container.style.backgroundRepeat = 'no-repeat';
-    container.style.borderRadius = radiusWithUnit;
+    if (colorLayer) {
+        colorLayer.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(finalSvg)}")`;
+        colorLayer.style.backgroundRepeat = 'no-repeat';
+        colorLayer.style.backgroundPosition = 'center';
+        colorLayer.style.backgroundSize = '100% 100%';
+    }
 }
 
 // --- Advanced Color Picker Logic ---
@@ -1095,6 +1141,7 @@ function initAdvancedPicker() {
 
     closeBtn?.addEventListener('click', () => {
         picker?.classList.add('hidden');
+        setWorkspaceActive(true);
     });
 
     addFavBtn?.addEventListener('click', () => {
@@ -1186,6 +1233,7 @@ function initAdvancedPicker() {
         const color = hexInput.value;
         applySelectedColor(color);
         picker?.classList.add('hidden');
+        setWorkspaceActive(true);
     });
 
     refreshAdvancedPicker = updateFromHSB;
@@ -1317,6 +1365,7 @@ function openAdvancedPicker() {
     }
 
     document.getElementById('advancedColorPicker')?.classList.remove('hidden');
+    setWorkspaceActive(false);
     updateCursorPosition();
 }
 
@@ -1347,8 +1396,13 @@ function applySelectedColor(color: string) {
         }
     } else if (activePickerId === 'canvasBorderColorPicker') {
         if (container) {
-            container.style.borderColor = color;
+            setCanvasBorderColor(color);
             updateCanvasBorder();
+        }
+    } else if (activePickerId === 'converterColorPicker') {
+        const converter = pageRouter.getConverterInstance();
+        if (converter) {
+            converter.updateFilterColor(color);
         }
     }
 
@@ -1393,7 +1447,7 @@ function rgbToHsb(r: number, g: number, b: number) {
 }
 
 function handleWheel(e: WheelEvent) {
-    if (!State.workspaceActive) return;
+    if (!State.workspaceActive || document.querySelector('.floating-window:not(.hidden)')) return;
     if (!workspace || !canvas) return;
     e.preventDefault();
 
@@ -1439,7 +1493,12 @@ let transformPivot = { x: 0, y: 0, minX: 0, minY: 0, width: 0, height: 0 };
 let modeBeforeMiddleClick: string | null = null;
 
 function updateCursor(e: PointerEvent) {
-    if (!State.workspaceActive) return;
+    if (!State.workspaceActive) {
+        if (document.body.style.cursor !== 'default') {
+            document.body.style.cursor = 'default';
+        }
+        return;
+    }
     // 1. Priority: Active drag states (locked cursors)
     if (State.isPanning) { document.body.style.cursor = 'grabbing'; return; }
     if (State.isMoving) { document.body.style.cursor = 'move'; return; }
@@ -1452,7 +1511,7 @@ function updateCursor(e: PointerEvent) {
     if (State.isRotating) { document.body.style.cursor = 'grabbing'; return; }
 
     const target = e.target as HTMLElement;
-    if (target.closest('.side-panel, .app-header')) {
+    if (target.closest('.side-panel, .app-header, .floating-window')) {
         document.body.style.cursor = 'default'; return;
     }
 
@@ -1481,7 +1540,7 @@ function updateCursor(e: PointerEvent) {
 function handlePointerDown(e: PointerEvent) {
     if (!State.workspaceActive) return;
     const target = e.target as HTMLElement;
-    if (target.closest('.side-panel') || target.closest('.app-header')) return;
+    if (target.closest('.side-panel, .app-header, .floating-window')) return;
 
     if (e.button === 1) {
         modeBeforeMiddleClick = State.currentMode; setMode('pan'); setPanning(true);

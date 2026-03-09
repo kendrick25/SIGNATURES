@@ -67,6 +67,9 @@ export class PageRouter {
             }
 
             document.body.style.cursor = 'default';
+            // Clear all workspace-related body classes
+            document.body.classList.remove('is-moving', 'is-panning', 'is-rotating', 'is-resizing-r', 'is-resizing-b', 'is-resizing-br');
+
 
             // Initialize converter if not already done
             if (!this.converterInstance) {
@@ -118,6 +121,10 @@ export class PageRouter {
 
     public getCurrentPage(): PageType {
         return this.currentPage;
+    }
+
+    public getConverterInstance(): ImageConverter | null {
+        return this.converterInstance;
     }
 }
 

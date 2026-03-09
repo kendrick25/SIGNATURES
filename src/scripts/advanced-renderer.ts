@@ -69,7 +69,9 @@ export class AdvancedStrokeRenderer {
     private parseColorWithGamma(color: string): { r: number; g: number; b: number; a: number } {
         let r = 0, g = 0, b = 0, a = 1;
 
-        if (color.startsWith('rgba')) {
+        if (color === 'transparent') {
+            return { r: 0, g: 0, b: 0, a: 0 };
+        } else if (color.startsWith('rgba')) {
             const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
             if (match) {
                 r = parseInt(match[1]);
@@ -186,12 +188,14 @@ export class AdvancedStrokeRenderer {
         if (stroke.points.length < 2) {
             // Single point - render as circle
             if (stroke.points.length === 1) {
-                this.renderDot(stroke.points[0], stroke.penColor, stroke.maxWidth);
+                const dotColor = stroke.penColor || (stroke as any).color || '#ffffff';
+                this.renderDot(stroke.points[0], dotColor, stroke.maxWidth);
             }
             return;
         }
-
-        const color = this.parseColorWithGamma(stroke.penColor);
+        // The original line already handles the fallback for 'color'
+        const strokeColor = stroke.penColor || (stroke as any).color || '#ffffff';
+        const color = this.parseColorWithGamma(strokeColor);
         const correctedColor = this.createGammaCorrectedColor(color);
 
         // Calculate cubic Bézier segments

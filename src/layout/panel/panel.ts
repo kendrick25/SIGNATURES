@@ -64,7 +64,7 @@ export const PanelHTML = `
                                     <span class="panel-input-label" data-i18n="opacity">OPACIDAD</span>
                                     <span id="alphaVal" class="panel-val-text">100%</span>
                                 </div>
-                                <input type="range" id="alphaSlider" min="0.1" max="1.0" step="0.05" value="1.0"
+                                <input type="range" id="alphaSlider" min="0" max="1.0" step="0.05" value="1.0"
                                     class="alpha-slider">
                             </div>
                             <div class="panel-input-group">
@@ -239,21 +239,6 @@ export const PanelHTML = `
                             </div>
                             <div class="panel-input-group">
                                 <div class="panel-input-header">
-                                    <span class="panel-input-label" data-i18n="borderRadius">RADIO DE
-                                        BORDE</span>
-                                    <div class="radius-unit-toggle">
-                                        <span id="radiusVal" class="panel-val-text">0px</span>
-                                        <div class="unit-btns" id="radiusUnitToggle">
-                                            <button class="unit-btn active" data-unit="px">px</button>
-                                            <button class="unit-btn" data-unit="%">%</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <input type="range" id="radiusSlider" min="0" max="100" step="1" value="0"
-                                    class="canvas-range">
-                            </div>
-                            <div class="panel-input-group">
-                                <div class="panel-input-header">
                                     <span class="panel-input-label" data-i18n="borderWidth">GROSOR DE
                                         BORDE</span>
                                     <span id="borderWidthVal" class="panel-val-text">1px</span>
@@ -269,6 +254,30 @@ export const PanelHTML = `
                                 </div>
                                 <input type="range" id="borderDashSlider" min="1" max="50" step="1" value="4"
                                     class="canvas-range" disabled>
+                            </div>
+                            <div class="panel-input-group" id="borderOffsetGroup">
+                                <div class="panel-input-header">
+                                    <span class="panel-input-label" data-i18n="borderOffset">SEPARACIÓN DE
+                                        BORDE</span>
+                                    <span id="borderOffsetVal" class="panel-val-text">0px</span>
+                                </div>
+                                <input type="range" id="borderOffsetSlider" min="0" max="100" step="1" value="0"
+                                    class="canvas-range">
+                            </div>
+                            <div class="panel-input-group">
+                                <div class="panel-input-header">
+                                    <span class="panel-input-label" data-i18n="borderRadius">RADIO DE
+                                        BORDE</span>
+                                    <div class="radius-unit-toggle">
+                                        <span id="radiusVal" class="panel-val-text">0px</span>
+                                        <div class="unit-btns" id="radiusUnitToggle">
+                                            <button class="unit-btn active" data-unit="px">px</button>
+                                            <button class="unit-btn" data-unit="%">%</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <input type="range" id="radiusSlider" min="0" max="100" step="1" value="0"
+                                    class="canvas-range">
                             </div>
                         </div>
                     </div>

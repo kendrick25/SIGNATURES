@@ -1,11 +1,13 @@
 import {
     State, signaturePad, history, redoStack, setSelectedIndices, setRedoStack, setThickness, setLastColor,
     sctx, selectionCanvas, setStrokeType, ratio, setClipboardStrokes, canvas, container, colorLayer, CANVAS_MARGIN,
-    setExportClipOutOfBounds, setUniform, setSmoothing, setColorQuality, ctx
+    setUniform, setSmoothing, setColorQuality, ctx, setWorkspaceActive, setExportClipOutOfBounds,
+    exportClipOutOfBounds,
+    currentCanvasBorderStyle, currentCanvasBorderColor, borderOpacity, currentRadiusUnit
 } from '@/scripts/state';
 import { updateSelectedBounds, syncControlsWithSelection, updateTransformPanelState, updateSelectionInfo } from '@/scripts/ui_updates';
 import { i18n, createIcons } from '@/scripts/data';
-import { currentCanvasBorderStyle, currentRadiusUnit, updateExportDpi, updateExportQuality } from '@/scripts/main';
+import { updateExportDpi, updateExportQuality } from '@/scripts/main';
 import { AdvancedStrokeRenderer } from '@/scripts/advanced-renderer';
 
 export function updateHintVisibility(forceHide = false) {
@@ -357,18 +359,36 @@ export function applyStrokeType(type: string) {
 }
 
 export function hexToRgba(hex: string, alpha: number) {
+    if (hex === 'transparent') return 'rgba(0, 0, 0, 0)';
     if (alpha >= 1) return hex;
     let r, g, b;
     if (hex.length === 4) {
         r = parseInt(hex[1] + hex[1], 16);
         g = parseInt(hex[2] + hex[2], 16);
         b = parseInt(hex[3] + hex[3], 16);
-    } else {
+    } else if (hex.length === 7) {
         r = parseInt(hex.slice(1, 3), 16);
         g = parseInt(hex.slice(3, 5), 16);
         b = parseInt(hex.slice(5, 7), 16);
+    } else {
+        // Fallback for non-hex colors if any
+        return hex;
     }
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function applyAlpha(color: string, alpha: number) {
+    if (!color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)') {
+        return 'rgba(0, 0, 0, 0)';
+    }
+    if (color.startsWith('rgba')) {
+        return color.replace(/[\d\.]+\)$/g, `${alpha})`);
+    } else if (color.startsWith('#')) {
+        return hexToRgba(color, alpha);
+    } else if (color.startsWith('rgb')) {
+        return color.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
+    }
+    return color;
 }
 
 export function applyColor(colorHex: string) {
@@ -381,7 +401,9 @@ export function applyColor(colorHex: string) {
         saveState();
         const data = signaturePad.toData();
         State.selectedStrokeIndices.forEach(index => {
-            if (data[index]) data[index].penColor = finalColor;
+            if (data[index]) {
+                data[index].penColor = finalColor;
+            }
         });
         safeFromData(data);
     }
@@ -570,7 +592,7 @@ function getExportCanvas() {
     let contentW: number, contentH: number;
     let baseMinX: number, baseMinY: number;
 
-    if (State.exportClipOutOfBounds) {
+    if (exportClipOutOfBounds) {
         contentW = baseW;
         contentH = baseH;
         baseMinX = 0;
@@ -649,26 +671,33 @@ function getExportCanvas() {
     // 7. Draw Borders
     const borderWidthSlider = document.getElementById('borderWidthSlider') as HTMLInputElement;
     const borderWidth = parseFloat(borderWidthSlider?.value || "0");
-    if (borderWidth > 0 && currentCanvasBorderStyle !== 'none') {
+    const bStyle = currentCanvasBorderStyle;
+    
+    if (borderWidth > 0 && bStyle !== 'none') {
         const sw = borderWidth * baseScale * renderScale;
         const inset = sw / 2;
         ectx.lineWidth = sw;
-        ectx.strokeStyle = container.style.borderColor || "rgba(255, 255, 255, 0.08)";
+        ectx.strokeStyle = applyAlpha(currentCanvasBorderColor, borderOpacity);
 
         const dashSlider = document.getElementById('borderDashSlider') as HTMLInputElement;
-        const dash = parseInt(dashSlider?.value || '4') * baseScale * renderScale;
-        if (currentCanvasBorderStyle === 'dashed') ectx.setLineDash([dash, dash]);
-        else if (currentCanvasBorderStyle === 'dotted') ectx.setLineDash([1, dash]);
-        else ectx.setLineDash([]);
-
-        strokeRoundedRect(ectx, inset, inset, pixelWidth - sw, pixelHeight - sw, Math.max(0, radius * renderScale - inset));
+        const dash = parseFloat(dashSlider?.value || '4') * baseScale * renderScale;
+        
+        if (bStyle === 'dashed') ectx.setLineDash([dash, dash]);
+        else if (bStyle === 'dotted') {
+            ectx.setLineDash([Math.max(1, sw/2), dash]);
+            ectx.lineCap = 'round';
+        }
+        const offset = State.borderOffset * baseScale * renderScale;
+        strokeRoundedRect(ectx, inset + offset, inset + offset, 
+            pixelWidth - sw - (offset * 2), pixelHeight - sw - (offset * 2), 
+            Math.max(0, radius * renderScale - inset - offset));
     }
 
     return exportCanvas;
 }
 
 export function downloadPng() {
-    if (signaturePad.isEmpty()) {
+    if (!signaturePad || signaturePad.toData().length === 0) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
@@ -728,7 +757,7 @@ export function getExportSvg(): string {
     let contentW: number, contentH: number;
     let baseMinX: number, baseMinY: number;
 
-    if (State.exportClipOutOfBounds) {
+    if (exportClipOutOfBounds) {
         contentW = baseW;
         contentH = baseH;
         baseMinX = 0;
@@ -760,7 +789,7 @@ export function getExportSvg(): string {
         : (currentRadiusUnit === '%' ? (radiusRaw / 100) * Math.min(baseW, baseH) : radiusRaw);
 
     const borderWidth = parseFloat((document.getElementById('borderWidthSlider') as HTMLInputElement)?.value || '0');
-    const bColor = container.style.borderColor || computedStyle.borderColor || "rgba(255, 255, 255, 0.08)";
+    const bColor = applyAlpha(currentCanvasBorderColor, borderOpacity);
     const bStyle = currentCanvasBorderStyle;
 
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${baseW * baseScale * renderScale} ${baseH * baseScale * renderScale}">`;
@@ -771,7 +800,7 @@ export function getExportSvg(): string {
     }
 
     // Strokes Container (with clipping if needed)
-    if (State.exportClipOutOfBounds) {
+    if (exportClipOutOfBounds) {
         const clipId = `clip-${Date.now()}`;
         svg += `<defs><clipPath id="${clipId}"><rect x="${shiftX * renderScale}" y="${shiftY * renderScale}" width="${baseW * fitScale * renderScale}" height="${baseH * fitScale * renderScale}"/></clipPath></defs>`;
         svg += `<g clip-path="url(#${clipId})">`;
@@ -810,17 +839,24 @@ export function getExportSvg(): string {
 
     svg += `</g>`;
 
-    // Border
+    // SVG Border
     if (borderWidth > 0 && bStyle !== 'none') {
         const sw = borderWidth * baseScale * renderScale;
-        const inset = sw / 2;
         const dashSlider = document.getElementById('borderDashSlider') as HTMLInputElement;
-        const dash = parseInt(dashSlider?.value || '4') * baseScale * renderScale;
-        let dashAttr = "";
-        if (bStyle === 'dashed') dashAttr = `stroke-dasharray="${dash},${dash}"`;
-        else if (bStyle === 'dotted') dashAttr = `stroke-dasharray="1,${dash}"`;
+        const dash = parseFloat(dashSlider?.value || '4') * baseScale * renderScale;
+        
+        let dashArray = 'none';
+        if (bStyle === 'dashed') dashArray = `${dash}, ${dash}`;
+        else if (bStyle === 'dotted') dashArray = `${Math.max(1, sw/2)}, ${dash}`;
 
-        svg += `<rect x="${inset}" y="${inset}" width="${(baseW * baseScale * renderScale) - sw}" height="${(baseH * baseScale * renderScale) - sw}" fill="none" stroke="${bColor}" stroke-width="${sw}" rx="${Math.max(0, radius * renderScale - inset)}" ry="${Math.max(0, radius * renderScale - inset)}" ${dashAttr}/>`;
+        const offset = State.borderOffset * baseScale * renderScale;
+        const totalInset = (sw / 2) + offset;
+        
+        svg += `<rect x="${totalInset}" y="${totalInset}" width="${baseW * baseScale * renderScale - sw - (offset * 2)}" height="${baseH * baseScale * renderScale - sw - (offset * 2)}" 
+                fill="none" stroke="${bColor}" stroke-width="${sw}" 
+                stroke-dasharray="${dashArray}" 
+                stroke-linecap="${bStyle === 'dotted' ? 'round' : 'butt'}"
+                rx="${Math.max(0, radius * renderScale - totalInset)}" ry="${Math.max(0, radius * renderScale - totalInset)}"/>`;
     }
 
     svg += `</svg>`;
@@ -829,7 +865,7 @@ export function getExportSvg(): string {
 
 
 export function downloadJpg() {
-    if (signaturePad.isEmpty()) {
+    if (!signaturePad || signaturePad.toData().length === 0) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
@@ -843,7 +879,7 @@ export function downloadJpg() {
 }
 
 export function downloadWebp() {
-    if (signaturePad.isEmpty()) {
+    if (!signaturePad || signaturePad.toData().length === 0) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
@@ -857,7 +893,7 @@ export function downloadWebp() {
 }
 
 export async function copyJpgBase64() {
-    if (signaturePad.isEmpty()) {
+    if (!signaturePad || signaturePad.toData().length === 0) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
@@ -873,7 +909,7 @@ export async function copyJpgBase64() {
 }
 
 export async function copyWebpBase64() {
-    if (signaturePad.isEmpty()) {
+    if (!signaturePad || signaturePad.toData().length === 0) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
@@ -889,7 +925,7 @@ export async function copyWebpBase64() {
 }
 
 export function downloadSvg() {
-    if (signaturePad.isEmpty()) {
+    if (!signaturePad || signaturePad.toData().length === 0) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
@@ -976,7 +1012,7 @@ function encodeBMP(canvas: HTMLCanvasElement): Blob {
 }
 
 export function downloadBmp() {
-    if (signaturePad.isEmpty()) {
+    if (!signaturePad || signaturePad.toData().length === 0) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
@@ -1165,7 +1201,7 @@ export function downloadTiff() {
 }
 
 export function triggerExport() {
-    if (signaturePad.isEmpty()) {
+    if (!signaturePad || signaturePad.toData().length === 0) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
@@ -1177,6 +1213,7 @@ function openExportModal() {
     if (!modal) return;
 
     modal.classList.remove('hidden');
+    setWorkspaceActive(false);
 
     // Default Enable "Clip Out Of Bounds" on open
     setExportClipOutOfBounds(true);
@@ -1274,6 +1311,15 @@ export function updateModalContext() {
         qualityGroup.style.display = (format === 'JPG' || format === 'WEBP') ? 'flex' : 'none';
     }
 
+    const base64Group = document.getElementById('base64OutputGroup');
+    const base64TextArea = document.getElementById('base64TextArea') as HTMLTextAreaElement;
+    if (base64Group && base64TextArea) {
+        const isBase64 = (action === 'base64');
+        base64Group.style.opacity = isBase64 ? '1' : '0.5';
+        base64TextArea.disabled = !isBase64;
+        base64TextArea.style.cursor = isBase64 ? 'text' : 'not-allowed';
+    }
+
     const finalBtnText = document.getElementById('finalBtnText');
     if (finalBtnText) {
         if (action === 'download') finalBtnText.textContent = i18n[State.currentLang as keyof typeof i18n].confirmExport;
@@ -1288,6 +1334,7 @@ export function updateExportPreview() {
     if (!container || container.offsetParent === null) return;
 
     const format = State.exportFormat;
+    const action = State.exportAction;
     const dimEl = document.getElementById('previewDimensions');
     const formatEl = document.getElementById('previewFormat');
 
@@ -1297,16 +1344,26 @@ export function updateExportPreview() {
 
     container.innerHTML = '';
 
+    let base64 = '';
+
     if (format === 'SVG') {
         const svg = getExportSvg();
         const wrapper = document.createElement('div');
         wrapper.innerHTML = svg;
         container.appendChild(wrapper.firstChild!);
+        base64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
     } else {
         const img = document.createElement('img');
         const mime = format === 'PNG' ? 'image/png' : format === 'JPG' ? 'image/jpeg' : 'image/webp';
-        img.src = exportCanvas.toDataURL(mime, State.exportQuality);
+        const dataURL = exportCanvas.toDataURL(mime, State.exportQuality);
+        img.src = dataURL;
         container.appendChild(img);
+        base64 = dataURL;
+    }
+
+    const textArea = document.getElementById('base64TextArea') as HTMLTextAreaElement;
+    if (textArea) {
+        textArea.value = (action === 'base64') ? base64 : "";
     }
 
     createIcons();
@@ -1314,7 +1371,7 @@ export function updateExportPreview() {
 
 
 export async function copyPngToClipboard() {
-    if (signaturePad.isEmpty()) {
+    if (!signaturePad || signaturePad.toData().length === 0) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
@@ -1334,7 +1391,7 @@ export async function copyPngToClipboard() {
 }
 
 export async function copyPngBase64() {
-    if (signaturePad.isEmpty()) {
+    if (!signaturePad || signaturePad.toData().length === 0) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }
@@ -1350,7 +1407,7 @@ export async function copyPngBase64() {
 }
 
 export async function copySvgBase64() {
-    if (signaturePad.isEmpty()) {
+    if (!signaturePad || signaturePad.toData().length === 0) {
         showToast(i18n[State.currentLang as keyof typeof i18n].toastSignFirst, "#ef4444");
         return;
     }

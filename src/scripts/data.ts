@@ -1,5 +1,5 @@
 import { createIcons as lucideCreateIcons, icons } from 'lucide';
-import { currentLang, UIConfig, I18nContent, setDynamicRefs, customColors, favoriteColors, State, setLang } from '@/scripts/state';
+import { currentLang, UIConfig, I18nContent, setDynamicRefs, customColors, favoriteColors, State, setLang, container } from '@/scripts/state';
 
 // ... (skipping i18n and UI_CONFIG constant definitions which are huge)
 
@@ -79,6 +79,7 @@ export const i18n: I18nContent = {
         borderType: "TIPO DE BORDE",
         borderColor: "COLOR DE BORDE",
         borderWidth: "GROSOR DE BORDE",
+        borderOffset: "Separación de Borde",
         solid: "Sólido",
         dashed: "Guiones",
         dotted: "Puntos",
@@ -98,7 +99,9 @@ export const i18n: I18nContent = {
         uniform: "TRAZO UNIFORME",
         smoothing: "SUAVIZADO DE CURVAS",
         colorQuality: "INTENSIDAD DE COLOR",
-        showGrid: "VER CUADRÍCULA"
+        showGrid: "VER CUADRÍCULA",
+        colorFilter: "FILTRO DE COLOR",
+        applyFilter: "Habilitar filtro de color"
     },
     en: {
         drawMode: "Drawing Mode (P)",
@@ -174,6 +177,7 @@ export const i18n: I18nContent = {
         borderType: "BORDER TYPE",
         borderColor: "BORDER COLOR",
         borderWidth: "BORDER WIDTH",
+        borderOffset: "Border Separation",
         solid: "Solid",
         dashed: "Dashed",
         dotted: "Dotted",
@@ -193,7 +197,9 @@ export const i18n: I18nContent = {
         uniform: "UNIFORM STROKE",
         smoothing: "CURVE SMOOTHING",
         colorQuality: "COLOR INTENSITY",
-        showGrid: "SHOW GRID"
+        showGrid: "SHOW GRID",
+        colorFilter: "COLOR FILTER",
+        applyFilter: "Enable color filter"
     }
 };
 
@@ -251,6 +257,7 @@ export function renderUIComponents() {
     renderColorPicker('colorPicker');
     renderColorPicker('canvasBgPicker');
     renderColorPicker('canvasBorderColorPicker');
+    renderColorPicker('converterColorPicker');
     renderCanvasPresets();
     renderSettings();
     renderWorkspaceShortcuts();
@@ -329,23 +336,26 @@ function renderStrokePresets() {
     `).join('');
 }
 
-function renderColorPicker(containerId: string) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
+export function renderColorPicker(containerId: string) {
+    const containerEl = document.getElementById(containerId);
+    if (!containerEl) return;
+
+    let currentVal = customColors[containerId];
+    if (!currentVal) {
+        if (containerId === 'colorPicker') currentVal = State.lastBaseColor;
+        else if (containerId === 'canvasBgPicker') currentVal = container?.dataset.bgColor || 'transparent';
+        else if (containerId === 'canvasBorderColorPicker') currentVal = State.currentCanvasBorderColor;
+    }
 
     const transparentDot = `
-        <div class="color-dot ${(!customColors[containerId] && State.favoriteColors.length === 0) ? 'active' : ''}" 
+        <div class="color-dot ${currentVal === 'transparent' ? 'active' : ''}" 
              style="background: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 8px 8px; background-position: 0 0, 0 4px, 4px 4px, 4px 0; background-color: #fff;" 
              data-color="transparent"></div>
     `;
 
     const favDots = favoriteColors.map(color => {
-        let active = false;
-        if (!customColors[containerId]) {
-            if (containerId === 'colorPicker' && color === '#ffffff') active = true; // Default stroke
-        }
-
-        const isLight = color.toLowerCase() === '#ffffff' || color.toLowerCase() === '#ffffff';
+        const active = currentVal?.toLowerCase() === color.toLowerCase();
+        const isLight = color.toLowerCase() === '#ffffff';
         const isBlack = color.toLowerCase() === '#000000';
         let dotStyle = `background: ${color};`;
         if (isBlack || isLight) dotStyle += 'border: 1px solid var(--glass-border);';
@@ -364,7 +374,7 @@ function renderColorPicker(containerId: string) {
         <div class="color-dot custom-selected-dot hidden" data-color=""></div>
     `;
 
-    container.innerHTML = `
+    containerEl.innerHTML = `
         ${transparentDot}
         ${favDots}
         ${customDotHtml}

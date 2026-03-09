@@ -35,10 +35,18 @@ export let redoStack: HistoryItem[] = [];
 export let selectedStrokeIndices: number[] = [];
 export let clipboardStrokes: any[] = [];
 export let currentLang = 'es';
+export let currentCanvasBorderStyle = 'none';
+export let currentCanvasBorderColor = '#ffffff';
+export let borderOpacity = 1.0;
+export let bgOpacity = 1.0;
+export let borderOffset = 0;
+export let currentCanvasBorderDistance = 0;
+export let currentRadiusUnit = 'px';
 export let customColors: Record<string, string> = {
     colorPicker: '',
     canvasBgPicker: '',
-    canvasBorderColorPicker: ''
+    canvasBorderColorPicker: '',
+    converterColorPicker: ''
 };
 export let exportQuality = 0.98; // Near lossless
 export let exportDpi = 300;     // Print quality
@@ -105,7 +113,14 @@ export const State = {
     get smoothing() { return smoothing; },
     get colorQuality() { return colorQuality; },
     get showGrid() { return showGrid; },
-    get workspaceActive() { return workspaceActive; }
+    get workspaceActive() { return workspaceActive; },
+    get currentCanvasBorderStyle() { return currentCanvasBorderStyle; },
+    get currentCanvasBorderColor() { return currentCanvasBorderColor; },
+    get borderOpacity() { return borderOpacity; },
+    get bgOpacity() { return bgOpacity; },
+    get borderOffset() { return borderOffset; },
+    get currentCanvasBorderDistance() { return currentCanvasBorderDistance; },
+    get currentRadiusUnit() { return currentRadiusUnit; }
 };
 
 export const setThickness = (val: number) => { currentThickness = val; };
@@ -154,7 +169,16 @@ export const setExportTarget = (val: { format: string, action: 'download' | 'cop
 export const setExportScale = (val: number) => { exportScale = val; };
 export const setExportMargin = (val: number) => { exportMargin = val; };
 export const setExportPreset = (val: string) => { exportPreset = val; };
-export const setWorkspaceActive = (val: boolean) => { workspaceActive = val; };
+export const setWorkspaceActive = (val: boolean) => {
+    workspaceActive = val;
+    if (signaturePad) {
+        if (val) {
+            if (currentMode === 'draw') signaturePad.on();
+        } else {
+            signaturePad.off();
+        }
+    }
+};
 
 export const setUniform = (val: boolean) => { isUniform = val; };
 export const setSmoothing = (val: number) => { smoothing = val; };
@@ -164,6 +188,14 @@ export const setFavoriteColors = (val: string[]) => {
     favoriteColors = val;
     localStorage.setItem('favoriteColors', JSON.stringify(val));
 };
+
+export const setCanvasBorderStyle = (val: string) => { currentCanvasBorderStyle = val; };
+export const setCanvasBorderColor = (val: string) => { currentCanvasBorderColor = val; };
+export const setBorderOpacity = (val: number) => { borderOpacity = val; };
+export const setBgOpacity = (val: number) => { bgOpacity = val; };
+export const setBorderOffset = (val: number) => { borderOffset = val; };
+export const setCanvasBorderDistance = (val: number) => { currentCanvasBorderDistance = val; };
+export const setRadiusUnit = (val: string) => { currentRadiusUnit = val; };
 
 
 // Export instances that will be initialized in initApp

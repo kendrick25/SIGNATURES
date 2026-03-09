@@ -69,7 +69,15 @@
     }
 }
 
+.export-settings-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+}
+
 .export-settings-form {
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 0.65rem;
@@ -78,7 +86,7 @@
     overflow-x: hidden;
     /* Prevent horizontal scroll */
     /* Scroll ONLY the settings if they are too tall */
-    padding-right: 4px;
+    padding-right: 8px;
     /* Space for scrollbar */
 
     /* Custom Scrollbar for settings */
@@ -93,9 +101,12 @@
 }
 
 .export-actions {
+    flex-shrink: 0;
     display: flex;
     gap: 0.75rem;
-    margin-top: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--glass-border);
 
     .apply-btn {
         flex: 1;
@@ -103,6 +114,9 @@
         align-items: center;
         justify-content: center;
         gap: 0.5rem;
+        height: 48px; // Ensure consistent large height
+        font-weight: 700;
+        letter-spacing: 0.05em;
 
         &.secondary {
             background: rgba(255, 255, 255, 0.05);

@@ -1,4 +1,4 @@
-import { createIcons } from '@/scripts/data';
+import { createIcons, renderColorPicker } from '@/scripts/data';
 import JSZip from 'jszip';
 import { getDocument, GlobalWorkerOptions, version } from 'pdfjs-dist';
 import { PDFDocument } from 'pdf-lib';
@@ -9,11 +9,14 @@ GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${version}/build/p
 interface SelectedImage {
     file: File;
     preview: string;
+    originalPreview?: string;
+    appliedFilterColor?: string;
     name: string;
     width: number;
     height: number;
     pageIndex?: number;
     sourceIsPdf?: boolean;
+    sourceUrl?: string;
 }
 
 interface ConversionJob {
@@ -44,6 +47,8 @@ export class ImageConverter {
     private currentFormat: string | null = null;
     private conversionJobCounter = 0;
     private selectedImageIndices: Set<number> = new Set();
+    private isFilterEnabled = false;
+    private filterColor = '#ffffff';
 
     constructor() {
         this.init();
@@ -54,6 +59,8 @@ export class ImageConverter {
         this.attachTabHandlers();
         this.attachFormatButtons();
         this.attachActionButtons();
+        this.attachUrlHandlers();
+        this.attachFilterHandlers();
         this.initializeIcons();
     }
 
@@ -192,6 +199,8 @@ export class ImageConverter {
 
                 if (targetTab === 'files') {
                     document.getElementById('filesTab')?.classList.add('active');
+                } else if (targetTab === 'url') {
+                    document.getElementById('urlTab')?.classList.add('active');
                 } else {
                     document.getElementById('textTab')?.classList.add('active');
                 }
@@ -209,6 +218,85 @@ export class ImageConverter {
                     textInput.value = ''; // Clear after processing
                 }
             });
+        }
+    }
+
+    private attachUrlHandlers() {
+        const btnProcessUrl = document.getElementById('btnProcessUrl');
+        const urlInput = document.getElementById('imageUrlInput') as HTMLInputElement;
+
+        if (btnProcessUrl && urlInput) {
+            btnProcessUrl.addEventListener('click', () => {
+                const url = urlInput.value.trim();
+                if (url) {
+                    this.processImageUrl(url);
+                    urlInput.value = '';
+                }
+            });
+
+            urlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const url = urlInput.value.trim();
+                    if (url) {
+                        this.processImageUrl(url);
+                        urlInput.value = '';
+                    }
+                }
+            });
+        }
+    }
+
+    private async processImageUrl(url: string) {
+        try {
+            // Check if it's already a base64/data URL
+            if (url.startsWith('data:')) {
+                this.processBase64String(url, `url-import-${Date.now()}`);
+                return;
+            }
+
+            const img = new Image();
+            img.crossOrigin = 'anonymous'; // Try to handle CORS
+            img.onload = () => {
+                // To avoid CORS issues when downloading/converting, we draw it to a canvas and get data URL
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.drawImage(img, 0, 0);
+                    try {
+                        const dataUrl = canvas.toDataURL('image/png');
+                        const urlFilename = url.split('/').pop()?.split('?')[0] || `url-import-${Date.now()}`;
+
+                        fetch(dataUrl)
+                            .then(res => res.blob())
+                            .then(blob => {
+                                const file = new File([blob], urlFilename, { type: blob.type });
+                                this.selectedImages.push({
+                                    file,
+                                    preview: dataUrl,
+                                    name: urlFilename,
+                                    width: img.width,
+                                    height: img.height,
+                                    sourceUrl: url
+                                });
+                                this.updateGallery();
+                                this.updateImageSelectionList();
+                            });
+                    } catch (e) {
+                        console.error('CORS error or invalid image data:', e);
+                        alert('No se pudo procesar la imagen de la URL debido a restricciones de seguridad (CORS) o formato inválido.');
+                    }
+                }
+            };
+            img.onerror = () => {
+                console.error('Failed to load image from URL:', url);
+                alert('No se pudo cargar la imagen desde la URL proporcionada. Asegúrate de que la URL sea válida y accesible.');
+            };
+            img.src = url;
+        } catch (err) {
+            console.error('Error processing URL:', err);
+            alert('Ocurrió un error al procesar la URL.');
         }
     }
 
@@ -420,6 +508,107 @@ export class ImageConverter {
                 this.updateBase64Availability();
             });
         }
+    }
+
+    private attachFilterHandlers() {
+        const toggle = document.getElementById('enableColorFilter') as HTMLInputElement;
+        const panel = document.getElementById('colorFilterPanel');
+
+        if (toggle && panel) {
+            toggle.addEventListener('change', () => {
+                this.isFilterEnabled = toggle.checked;
+                panel.classList.toggle('hidden', !this.isFilterEnabled);
+
+                if (this.isFilterEnabled) {
+                    renderColorPicker('converterColorPicker');
+                    this.refreshAllFilters();
+                } else {
+                    this.resetImagesToOriginal();
+                }
+            });
+        }
+    }
+
+    public updateFilterColor(color: string) {
+        this.filterColor = color;
+        // Only apply to selected if filter is enabled
+        if (this.isFilterEnabled) {
+            this.applyFilterToSelected();
+        }
+    }
+
+    private async refreshAllFilters() {
+        if (!this.isFilterEnabled) return;
+        
+        let changed = false;
+        for (const img of this.selectedImages) {
+            if (img.appliedFilterColor) {
+                if (!img.originalPreview) img.originalPreview = img.preview;
+                img.preview = await this.applyColorFilter(img.originalPreview!, img.appliedFilterColor);
+                changed = true;
+            }
+        }
+        if (changed) {
+            this.updateGallery();
+        }
+    }
+
+    private async applyFilterToSelected() {
+        if (!this.isFilterEnabled) return;
+
+        const indicesToFilter = this.selectedImageIndices.size > 0 
+            ? Array.from(this.selectedImageIndices) 
+            : [];
+
+        if (indicesToFilter.length === 0) return;
+
+        for (const idx of indicesToFilter) {
+            const img = this.selectedImages[idx];
+            if (!img) continue;
+
+            if (!img.originalPreview) {
+                img.originalPreview = img.preview;
+            }
+            img.appliedFilterColor = this.filterColor;
+            img.preview = await this.applyColorFilter(img.originalPreview!, this.filterColor);
+        }
+        this.updateGallery();
+    }
+
+    private resetImagesToOriginal() {
+        for (const img of this.selectedImages) {
+            if (img.originalPreview) {
+                img.preview = img.originalPreview;
+            }
+        }
+        this.updateGallery();
+    }
+
+    private applyColorFilter(dataUrl: string, color: string): Promise<string> {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    resolve(dataUrl);
+                    return;
+                }
+
+                ctx.drawImage(img, 0, 0);
+
+                // Tint logic
+                ctx.globalCompositeOperation = 'source-in';
+                ctx.fillStyle = color;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                resolve(canvas.toDataURL('image/png'));
+            };
+            img.onerror = () => resolve(dataUrl);
+            img.src = dataUrl;
+        });
     }
 
     // ==================== FORMAT SELECTION ====================
@@ -1021,7 +1210,12 @@ export class ImageConverter {
                         const isJpg = image.file.type === 'image/jpeg' || image.name.toLowerCase().endsWith('.jpg') || image.name.toLowerCase().endsWith('.jpeg');
 
                         try {
-                            if (isJpg) {
+                            if (this.isFilterEnabled) {
+                                // If filter is enabled, embed the filtered preview (PNG)
+                                const response = await fetch(image.preview);
+                                const filteredBytes = await response.arrayBuffer();
+                                pdfObject = await pdfDoc.embedPng(filteredBytes);
+                            } else if (isJpg) {
                                 pdfObject = await pdfDoc.embedJpg(imgBytes);
                             } else {
                                 // Try PNG, if fail try JPG (sometimes extensions are wrong)
@@ -1034,7 +1228,7 @@ export class ImageConverter {
                         } catch (e) {
                             console.error('Error embedding image in PDF:', e);
                             // Fallback: draw to canvas and then embed
-                            const canvas = await this.imageToCanvas(image.file, undefined, undefined, isPdf ? image.preview : undefined);
+                            const canvas = await this.imageToCanvas(image.file, undefined, undefined, (isPdf || this.isFilterEnabled) ? image.preview : undefined);
                             const dataUrl = canvas.toDataURL('image/png');
                             const fallbackBytes = await (await fetch(dataUrl)).arrayBuffer();
                             pdfObject = await pdfDoc.embedPng(fallbackBytes);
@@ -1110,7 +1304,8 @@ export class ImageConverter {
                 } else {
                     // Handle regular formats via canvas
                     const isPdfInput = !!image.sourceIsPdf;
-                    const canvas = await this.imageToCanvas(image.file, job.width, job.height, isPdfInput ? image.preview : undefined);
+                    const usePreview = isPdfInput || this.isFilterEnabled;
+                    const canvas = await this.imageToCanvas(image.file, job.width, job.height, usePreview ? image.preview : undefined);
                     const newFileName = this.getFileName(filename, job.format);
                     const mimeType = this.getMimeType(job.format);
 

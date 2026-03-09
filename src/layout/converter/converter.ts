@@ -13,6 +13,7 @@ export const ConverterHTML = `
                         <h2>1. Selecciona las imágenes</h2>
                         <div class="upload-tabs">
                             <button class="upload-tab active" data-tab="files">Imágenes / Archivos</button>
+                            <button class="upload-tab" data-tab="url">URL</button>
                             <button class="upload-tab" data-tab="text">Texto Base64</button>
                         </div>
                     </div>
@@ -26,6 +27,17 @@ export const ConverterHTML = `
                                     <i data-lucide="upload-cloud" class="upload-icon"></i>
                                     <p data-i18n="dragAndDrop">Arrastra archivos (PNG, JPG, WEBP, BMP, TIFF, SVG, ICO, TXT, PDF) aquí o haz clic para seleccionar</p>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- URL Input Tab -->
+                        <div class="upload-tab-content" id="urlTab">
+                            <div class="url-input-area-wrapper">
+                                <div class="url-input-group">
+                                    <i data-lucide="link" class="input-icon"></i>
+                                    <input type="text" id="imageUrlInput" class="styled-input" placeholder="Pega la URL de la imagen aquí (ej: https://ejemplo.com/imagen.jpg)">
+                                </div>
+                                <button class="btn-process-url" id="btnProcessUrl">Procesar URL</button>
                             </div>
                         </div>
 
@@ -43,6 +55,21 @@ export const ConverterHTML = `
                 <div class="converter-section" id="gallerySection">
                     <div class="section-header">
                         <h2>2. Previsualización y renombrado</h2>
+                        <div class="filter-toggle-container">
+                            <label class="toggle-switch small">
+                                <input type="checkbox" id="enableColorFilter">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="filter-label" data-i18n="applyFilter">Habilitar filtro de color</span>
+                        </div>
+                    </div>
+
+                    <!-- Filter Panel (hidden by default) -->
+                    <div class="filter-panel hidden" id="colorFilterPanel">
+                        <div class="panel-input-group">
+                            <span class="panel-input-label" data-i18n="colorFilter">FILTRO DE COLOR</span>
+                            <div class="color-picker" id="converterColorPicker"></div>
+                        </div>
                     </div>
                     
                     <div class="mini-gallery" id="miniGallery">

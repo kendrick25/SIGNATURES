@@ -58,7 +58,7 @@ export function syncControlsWithSelection() {
     if (!first || typeof first.maxWidth === 'undefined' || typeof first.minWidth === 'undefined') return;
 
     const currentThicknessVal = (first.maxWidth + first.minWidth) / 2;
-    const strokeColor = first.penColor || '#ffffff';
+    const strokeColor = first.penColor || (first as any).color || '#ffffff';
     let base = '#ffffff', alpha = 1.0;
 
     if (strokeColor.startsWith('rgba')) {
