@@ -1,5 +1,6 @@
-import { container, workspace, workspacePan, workspaceScale, signaturePad, canvas, sctx, ctx, selectionCanvas, hint, selectedStrokeIndices } from '@/scripts/state';
-import { drawSelectionHighlights } from '@/scripts/canvas';
+import { container, workspace, workspacePan, workspaceScale, ratio, signaturePad, canvas, sctx, ctx, selectionCanvas, selectedStrokeIndices, CANVAS_MARGIN } from '@/scripts/state';
+import { drawSelectionHighlights, updateHintVisibility, safeFromData } from '@/scripts/canvas';
+import { updateSelectedBounds } from '@/scripts/ui_updates';
 
 
 
@@ -32,9 +33,12 @@ export function updateWorkspaceTransform() {
 
 export function updateSignaturePadOptions() {
     if (!signaturePad) return;
-    // Balanced adjustment: enough points for curves, not too many to cause jitter
-    signaturePad.minDistance = 0; // Stroke starts immediately at mouse down
-    signaturePad.throttle = 0; // Absolute 1:1 instantaneous response
+    // Balanced adjustment for ultra-smooth curves
+    // We delegate logic to ensure consistency, but if we have circular dependency issues, 
+    // we'll manually set the most safe defaults here.
+    // The actual tool styles are re-applied by the UI interactions.
+    signaturePad.throttle = 8;     // Small buffer to smooth out high-frequency sensor noise
+    signaturePad.minDistance = 1.0; // Minimal filter to prevent micro-jitter while keeping detail
 }
 
 export function syncSizeValues() {
@@ -55,45 +59,90 @@ export function resizeCanvas() {
     // Store data to restore after resize
     const data = signaturePad.toData();
 
-    // Use current devicePixelRatio to handle browser zoom levels dynamically
-    const currentRatio = Math.max(window.devicePixelRatio || 1, 1);
-    const effectiveScale = currentRatio;
+    // Unified High-Quality Ratio (Super-Sampling)
+    const effectiveScale = ratio;
 
-    // Use clientWidth to avoid border-induced growth loops
-    const baseWidth = Math.floor(container.clientWidth);
-    const baseHeight = Math.floor(container.clientHeight);
+    const baseWidth = container.clientWidth;
+    const baseHeight = container.clientHeight;
 
-    const newWidth = Math.floor(baseWidth * effectiveScale);
-    const newHeight = Math.floor(baseHeight * effectiveScale);
+    // We make the canvas HUGE to allow drawing/seeing strokes outside the visible container.
+    const margin = CANVAS_MARGIN;
+    const canvasW = baseWidth + margin * 2;
+    const canvasH = baseHeight + margin * 2;
+
+    // Use Math.round to ensure exact physical pixel mapping
+    const newWidth = Math.round(canvasW * effectiveScale);
+    const newHeight = Math.round(canvasH * effectiveScale);
 
     if (canvas.width !== newWidth || canvas.height !== newHeight) {
-        // Essential: Set internal resolution
         canvas.width = newWidth;
         canvas.height = newHeight;
 
-        // Essential: Set CSS size to match container's LOGICAL size
-        canvas.style.width = baseWidth + 'px';
-        canvas.style.height = baseHeight + 'px';
+        // CSS sizing and translation to keep the "logical" (0,0) at the container's top-left
+        canvas.style.width = canvasW + 'px';
+        canvas.style.height = canvasH + 'px';
+        canvas.style.marginLeft = `-${margin}px`;
+        canvas.style.marginTop = `-${margin}px`;
+        canvas.style.transform = 'translateZ(0)'; // Force GPU layer
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(effectiveScale, effectiveScale);
+        ctx.translate(margin, margin); // Offset everything so "logical 0,0" is the page start
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
 
         if (selectionCanvas && sctx) {
             selectionCanvas.width = newWidth;
             selectionCanvas.height = newHeight;
-            selectionCanvas.style.width = baseWidth + 'px';
-            selectionCanvas.style.height = baseHeight + 'px';
+            selectionCanvas.style.width = canvasW + 'px';
+            selectionCanvas.style.height = canvasH + 'px';
+            selectionCanvas.style.marginLeft = `-${margin}px`;
+            selectionCanvas.style.marginTop = `-${margin}px`;
+            selectionCanvas.style.transform = 'translateZ(0)';
+
             sctx.setTransform(1, 0, 0, 1, 0, 0);
             sctx.scale(effectiveScale, effectiveScale);
+            sctx.translate(margin, margin);
+            sctx.imageSmoothingEnabled = true;
+            sctx.imageSmoothingQuality = 'high';
         }
+
+        // Patch clear to work with huge canvas and transforms
+        const originalClear = signaturePad.clear.bind(signaturePad);
+        signaturePad.clear = function () {
+            // First do the original clear to reset internal library state
+            originalClear();
+
+            // Then manually clear the physical canvas areas using identity transforms
+            // because SignaturePad's clear() respects current context transformations
+            // which might not cover the whole 2000px margin area.
+            const pad = signaturePad as any;
+            const c = pad.canvas || pad._canvas;
+            if (c) {
+                const context = c.getContext('2d');
+                if (context) {
+                    context.save();
+                    context.setTransform(1, 0, 0, 1, 0, 0);
+                    context.clearRect(0, 0, c.width, c.height);
+                    context.restore();
+                }
+            }
+
+            // Sync selection canvas too
+            if (sctx && selectionCanvas) {
+                sctx.save();
+                sctx.setTransform(1, 0, 0, 1, 0, 0);
+                sctx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+                sctx.restore();
+            }
+        };
 
         signaturePad.clear();
         if (data.length > 0) {
-            signaturePad.fromData(data);
-            if (hint) hint.classList.add('hidden');
-        } else {
-            if (hint) hint.classList.remove('hidden');
+            safeFromData(data);
         }
+        updateHintVisibility();
         drawSelectionHighlights();
     }
 }
@@ -125,7 +174,7 @@ export function autoAdjustCanvas() {
     const currentW = maxX - minX;
     const currentH = maxY - minY;
 
-    const padding = 60; // Comfortable padding
+    const padding = 0; // No padding as requested
     const availableW = Math.max(100, container.offsetWidth - padding);
     const availableH = Math.max(100, container.offsetHeight - padding);
 
@@ -157,16 +206,14 @@ export function autoAdjustCanvas() {
                 // 3. Move to target center
                 p.x = x + targetCx;
                 p.y = y + targetCy;
-
-                // Scale width
-                p.pressure *= finalScale; // Optional: scale pressure/width too to match?
             });
             data[idx].minWidth *= finalScale;
             data[idx].maxWidth *= finalScale;
         }
     });
 
-    signaturePad.fromData(data);
+    safeFromData(data);
+    updateHintVisibility();
     drawSelectionHighlights();
 
     // Reset workspace pan so the centered content is visible
@@ -181,10 +228,16 @@ export function recenterCanvas() {
     const containerWidth = container.offsetWidth;
     const containerHeight = container.offsetHeight;
 
-    // Calculate top-left position to center at scale 1
-    // We treat this centered position as the "natural" origin for workspacePan
-    workspacePan.x = (viewportRect.width - containerWidth) / 2;
-    workspacePan.y = (viewportRect.height - containerHeight) / 2;
+    // Calculate top-left position to center the SCALED container
+    // Since transform-origin is 0 0, the physical space occupied is (originalSize * scale)
+    workspacePan.x = (viewportRect.width - containerWidth * workspaceScale) / 2;
+    workspacePan.y = (viewportRect.height - containerHeight * workspaceScale) / 2;
 
     updateWorkspaceTransform();
+
+    // Update selection bounds if there are selected strokes
+    if (selectedStrokeIndices.length > 0) {
+        updateSelectedBounds();
+        drawSelectionHighlights();
+    }
 }

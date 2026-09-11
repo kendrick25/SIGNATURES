@@ -35,16 +35,50 @@ export let redoStack: HistoryItem[] = [];
 export let selectedStrokeIndices: number[] = [];
 export let clipboardStrokes: any[] = [];
 export let currentLang = 'es';
+export let currentCanvasBorderStyle = 'none';
+export let currentCanvasBorderColor = '#ffffff';
+export let borderOpacity = 1.0;
+export let bgOpacity = 1.0;
+export let borderOffset = 0;
+export let currentCanvasBorderDistance = 0;
+export let currentRadiusUnit = 'px';
+export let customColors: Record<string, string> = {
+    colorPicker: '',
+    canvasBgPicker: '',
+    canvasBorderColorPicker: '',
+    converterColorPicker: ''
+};
+export let exportQuality = 0.98; // Near lossless
+export let exportDpi = 300;     // Print quality
+export let exportFormat = 'PNG';
+export let exportAction = 'download';
+export let exportClipOutOfBounds = true;
+export let viewClipOutOfBounds = true;
+export let showGrid = true;
+export let exportTarget: { format: string, action: 'download' | 'copy' | 'base64', isBase64?: boolean } | null = null;
+export let exportScale = 1;
+export let exportMargin = 0;
+export let exportPreset = 'DEFAULT';
+
+export let isUniform = false;
+export let smoothing = 0.6; // Higher = smoother curves
+export let colorQuality = 1.0; // Higher = more vibrant/liquid feel
+
+const savedFavorites = localStorage.getItem('favoriteColors');
+export let favoriteColors: string[] = savedFavorites ? JSON.parse(savedFavorites) : ['#ffffff', '#6366f1', '#06b6d4', '#000000'];
 
 export let isSelecting = false;
 export let isMoving = false;
 export let isResizing = false;
 export let isRotating = false;
 export let isPanning = false;
+export let workspaceActive = true;
 
 export let workspacePan = { x: 0, y: 0 };
 export let workspaceScale = 1.0;
-export let ratio = Math.max(window.devicePixelRatio || 1, 1);
+// Super-Sampling Ratio: Using an integer multiple of devicePixelRatio for crispest rendering.
+export let ratio = Math.ceil(window.devicePixelRatio || 1) * 2;
+export const CANVAS_MARGIN = 400; // Optimal margin to balance memory and overflow freedom
 
 // State Mutators (since we can't change exported 'let' from other modules in ESM directly without functions)
 // Global State Object for true live bindings across modules
@@ -63,7 +97,30 @@ export const State = {
     get workspaceScale() { return workspaceScale; },
     get selectedStrokeIndices() { return selectedStrokeIndices; },
     get currentLang() { return currentLang; },
-    get clipboardStrokes() { return clipboardStrokes; }
+    get clipboardStrokes() { return clipboardStrokes; },
+    get favoriteColors() { return favoriteColors; },
+    get exportQuality() { return exportQuality; },
+    get exportDpi() { return exportDpi; },
+    get exportFormat() { return exportFormat; },
+    get exportAction() { return exportAction; },
+    get exportClipOutOfBounds() { return exportClipOutOfBounds; },
+    get viewClipOutOfBounds() { return viewClipOutOfBounds; },
+    get exportTarget() { return exportTarget; },
+    get exportScale() { return exportScale; },
+    get exportMargin() { return exportMargin; },
+    get exportPreset() { return exportPreset; },
+    get isUniform() { return isUniform; },
+    get smoothing() { return smoothing; },
+    get colorQuality() { return colorQuality; },
+    get showGrid() { return showGrid; },
+    get workspaceActive() { return workspaceActive; },
+    get currentCanvasBorderStyle() { return currentCanvasBorderStyle; },
+    get currentCanvasBorderColor() { return currentCanvasBorderColor; },
+    get borderOpacity() { return borderOpacity; },
+    get bgOpacity() { return bgOpacity; },
+    get borderOffset() { return borderOffset; },
+    get currentCanvasBorderDistance() { return currentCanvasBorderDistance; },
+    get currentRadiusUnit() { return currentRadiusUnit; }
 };
 
 export const setThickness = (val: number) => { currentThickness = val; };
@@ -78,10 +135,67 @@ export const setClipboardStrokes = (val: any[]) => { clipboardStrokes = val; };
 export const setLang = (val: string) => { currentLang = val; };
 export const setWorkspaceScale = (val: number) => { workspaceScale = val; };
 export const setSelecting = (val: boolean) => { isSelecting = val; };
-export const setMoving = (val: boolean) => { isMoving = val; };
-export const setResizing = (val: boolean) => { isResizing = val; };
-export const setRotating = (val: boolean) => { isRotating = val; };
-export const setPanning = (val: boolean) => { isPanning = val; };
+export const setMoving = (val: boolean) => {
+    isMoving = val;
+    if (val) document.body.classList.add('is-moving');
+    else document.body.classList.remove('is-moving');
+};
+export const setResizing = (val: boolean, type?: string) => {
+    isResizing = val;
+    // Remove all resize classes first
+    document.body.classList.remove('is-resizing-r', 'is-resizing-b', 'is-resizing-br');
+    if (val && type) {
+        document.body.classList.add(`is-resizing-${type}`);
+    }
+};
+export const setRotating = (val: boolean) => {
+    isRotating = val;
+    if (val) document.body.classList.add('is-rotating');
+    else document.body.classList.remove('is-rotating');
+};
+export const setPanning = (val: boolean) => {
+    isPanning = val;
+    if (val) document.body.classList.add('is-panning');
+    else document.body.classList.remove('is-panning');
+};
+export const setExportQuality = (val: number) => { exportQuality = val; };
+export const setExportDpi = (val: number) => { exportDpi = val; };
+export const setExportFormat = (val: string) => { exportFormat = val; };
+export const setExportAction = (val: string) => { exportAction = val; };
+export const setExportClipOutOfBounds = (val: boolean) => { exportClipOutOfBounds = val; };
+export const setViewClipOutOfBounds = (val: boolean) => { viewClipOutOfBounds = val; };
+export const setShowGrid = (val: boolean) => { showGrid = val; };
+export const setExportTarget = (val: { format: string, action: 'download' | 'copy' | 'base64', isBase64?: boolean } | null) => { exportTarget = val; };
+export const setExportScale = (val: number) => { exportScale = val; };
+export const setExportMargin = (val: number) => { exportMargin = val; };
+export const setExportPreset = (val: string) => { exportPreset = val; };
+export const setWorkspaceActive = (val: boolean) => {
+    workspaceActive = val;
+    if (signaturePad) {
+        if (val) {
+            if (currentMode === 'draw') signaturePad.on();
+        } else {
+            signaturePad.off();
+        }
+    }
+};
+
+export const setUniform = (val: boolean) => { isUniform = val; };
+export const setSmoothing = (val: number) => { smoothing = val; };
+export const setColorQuality = (val: number) => { colorQuality = val; };
+
+export const setFavoriteColors = (val: string[]) => {
+    favoriteColors = val;
+    localStorage.setItem('favoriteColors', JSON.stringify(val));
+};
+
+export const setCanvasBorderStyle = (val: string) => { currentCanvasBorderStyle = val; };
+export const setCanvasBorderColor = (val: string) => { currentCanvasBorderColor = val; };
+export const setBorderOpacity = (val: number) => { borderOpacity = val; };
+export const setBgOpacity = (val: number) => { bgOpacity = val; };
+export const setBorderOffset = (val: number) => { borderOffset = val; };
+export const setCanvasBorderDistance = (val: number) => { currentCanvasBorderDistance = val; };
+export const setRadiusUnit = (val: string) => { currentRadiusUnit = val; };
 
 
 // Export instances that will be initialized in initApp
@@ -99,6 +213,7 @@ export let hint: HTMLElement;
 export let selectionBox: HTMLElement;
 export let sidePanel: HTMLElement;
 export let selectionInfo: HTMLElement;
+export let colorLayer: HTMLElement;
 
 export const setDomRefs = (refs: any) => {
     canvas = refs.canvas;
@@ -111,6 +226,7 @@ export const setDomRefs = (refs: any) => {
     selectionBox = refs.selectionBox;
     sidePanel = refs.sidePanel;
     selectionInfo = refs.selectionInfo;
+    colorLayer = refs.colorLayer;
 };
 
 // Dynamic references

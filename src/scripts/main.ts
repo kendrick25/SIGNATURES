@@ -4,27 +4,35 @@ import {
     setSelecting, setResizing,
     setRotating,
     setSelectedIndices, history, redoStack, currentLang,
-    workspace, hint, selectionInfo, selectionBox,
+    workspace, selectionBox,
     sidePanel, lastBaseColor, setAlpha,
-    container, canvas, selectionCanvas, setWorkspaceScale
+    container, canvas, selectionCanvas, colorLayer, setWorkspaceScale, customColors,
+    favoriteColors, setFavoriteColors, setExportQuality, setExportDpi, setExportFormat, setExportAction, setExportClipOutOfBounds, setViewClipOutOfBounds, setShowGrid, setExportScale, setExportMargin, setExportPreset, CANVAS_MARGIN, setWorkspaceActive,
+    setCanvasBorderStyle, setCanvasBorderColor, setBorderOpacity, setBgOpacity, setRadiusUnit, setBorderOffset
 } from '@/scripts/state';
 import {
     saveState, undo, redo, updateThickness, applyStrokeType,
     applyColor, drawSelectionHighlights, updateStrokeStyles,
     updateStrokePreview, downloadPng, downloadSvg, copyPngToClipboard,
     copySelection, pasteSelection, deleteSelection,
-    rotateSelection90, flipSelection, scaleSelection
+    rotateSelection90, flipSelection, scaleSelection, showToast, updateHintVisibility, safeFromData, copyPngBase64, copySvgBase64,
+    downloadJpg, downloadWebp, copyJpgBase64, copyWebpBase64, triggerExport, updateExportPreview, updateModalContext,
+    updateUniform, updateSmoothing, updateColorQuality, downloadBmp, downloadTiff
 } from '@/scripts/canvas';
 import {
     updateWorkspaceTransform, syncSizeValues,
     recenterCanvas, resizeCanvas, autoAdjustCanvas
 } from '@/scripts/workspace';
-import { renderUIComponents, updateGlobalReferences, createIcons, updateLanguage } from '@/scripts/data';
-import { updateSelectedBounds, getSelectedDataBounds, syncControlsWithSelection, updateTransformPanelState } from '@/scripts/ui_updates';
+import { renderUIComponents, updateGlobalReferences, createIcons, updateLanguage, i18n } from '@/scripts/data';
+import { updateSelectedBounds, getSelectedDataBounds, syncControlsWithSelection, updateTransformPanelState, updateSelectionInfo } from '@/scripts/ui_updates';
+import { pageRouter } from '@/scripts/router';
 
 
 
 // --- Initialization ---
+
+let activePickerId: string | null = null;
+let currentPickerColor = { h: 0, s: 100, v: 100 };
 
 export function initAppLogic() {
     updateLanguage(currentLang);
@@ -33,16 +41,25 @@ export function initAppLogic() {
     updateStrokeStyles();
     updateStrokePreview();
     updateHistoryButtons();
+    updateCanvasBorder();
+    if (container && !container.dataset.bgColor) {
+        container.dataset.bgColor = 'transparent';
+    }
+    updateCanvasBackground();
+    updateWorkspaceView();
 
     (window as any).currentMode = 'draw';
     setMode('draw');
     recenterCanvas();
     updateTransformPanelState();
+    updateSelectionInfo();
 
     attachEventListeners();
     attachDynamicListeners();
     initSidebarResizing();
     updateWorkspaceLayout();
+    initAdvancedPicker();
+    makeDraggable('exportModal');
 
     // Initial state check for body classes
     if (sidePanel) {
@@ -52,25 +69,24 @@ export function initAppLogic() {
 
     if (signaturePad) {
         // Fix for SignaturePad 5.x: The library expects _createPoint(clientX, clientY, pressure).
-        // It internally subtracts getBoundingClientRect().left/top.
-        // We wrap it to apply our workspace zoom factor (s).
         const originalCreatePoint = (signaturePad as any)._createPoint;
         if (typeof originalCreatePoint === 'function') {
             (signaturePad as any)._createPoint = function (x: number, y: number, pressure: number) {
                 const rect = canvas.getBoundingClientRect();
-
                 // Definitive scale factor: realized screen width / logical layout width
-                // This handles workspace zoom (CSS transform: scale).
-                // Browser zoom is transparent as clientX and rect are both in CSS pixels.
                 const s = rect.width / (canvas.clientWidth || 1);
 
-                // We want the resulting internal point to be: (clientX - rect.left) / s
-                // Since the original method does (x_input - rect.left), we must pass it: 
-                // x_input = rect.left + (clientX - rect.left) / s
-                const x_patched = rect.left + (x - rect.left) / (s || 1);
-                const y_patched = rect.top + (y - rect.top) / (s || 1);
+                // 1. Convert screen to logical canvas coordinates (0 to HUGE)
+                const logicalXHuge = (x - rect.left) / (s || 1);
+                const logicalYHuge = (y - rect.top) / (s || 1);
 
-                return originalCreatePoint.call(this, x_patched, y_patched, pressure);
+                // 2. Subtract margin so (0,0) is at container top-left
+                const logicalX = logicalXHuge - CANVAS_MARGIN;
+                const logicalY = logicalYHuge - CANVAS_MARGIN;
+
+                // 3. SignaturePad internally subtracts rect.left, 
+                // so we pass rect.left + logical coord to counteract it.
+                return originalCreatePoint.call(this, rect.left + logicalX, rect.top + logicalY, pressure);
             };
         }
 
@@ -78,6 +94,7 @@ export function initAppLogic() {
         (signaturePad as any)._getPointFromEvent = (signaturePad as any)._createPoint;
     }
     updateTransformPanelState();
+    updateHintVisibility();
 }
 
 function updateHistoryButtons() {
@@ -99,12 +116,12 @@ function setMode(mode: string) {
     if (mode === 'draw') {
         canvas.style.cursor = 'crosshair';
         signaturePad.on();
-        if (hint && signaturePad.isEmpty()) hint.classList.remove('hidden');
+        updateHintVisibility();
         if (selectionCanvas) selectionCanvas.classList.remove('active');
         deselectStroke(false);
     } else {
         signaturePad.off();
-        if (hint) hint.classList.add('hidden');
+        updateHintVisibility();
         if (mode === 'transform' || mode === 'select') {
             canvas.style.cursor = 'default';
             if (selectionCanvas) selectionCanvas.classList.add('active');
@@ -172,11 +189,11 @@ function setupScrubbing(areaId: string, getValue: () => number, setValue: (v: nu
 
 // --- REFINED COORDINATE MAPPING (Excalidraw Style) ---
 function getCanvasCoordinates(e: any) {
-    if (!canvas || !workspace) return { x: 0, y: 0 };
+    if (!container || !workspace) return { x: 0, y: 0 };
 
-    const rect = canvas.getBoundingClientRect();
-    const sx = rect.width / (canvas.clientWidth || 1);
-    const sy = rect.height / (canvas.clientHeight || 1);
+    const rect = container.getBoundingClientRect();
+    const sx = rect.width / (container.clientWidth || 1);
+    const sy = rect.height / (container.clientHeight || 1);
     const s = (sx + sy) / 2;
 
     const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
@@ -186,6 +203,41 @@ function getCanvasCoordinates(e: any) {
         x: (clientX - rect.left) / (s || 1),
         y: (clientY - rect.top) / (s || 1)
     };
+}
+
+export function updateExportDpi(val: string | number) {
+    let dpi = parseFloat(val.toString());
+    if (isNaN(dpi)) dpi = 96; // Default fallback
+    dpi = Math.max(72, Math.min(10000, dpi));
+    setExportDpi(dpi);
+
+    // Update modal elements
+    const el = document.getElementById('modalDpiVal') as HTMLInputElement;
+    if (el) el.value = Math.round(dpi).toString();
+
+    // Active state managed by click listeners now.
+
+    // If modal is open, update preview
+    if (!document.getElementById('exportModal')?.classList.contains('hidden')) {
+        updateExportPreview();
+    }
+}
+
+export function updateExportQuality(val: string | number) {
+    const quality = Math.max(10, Math.min(100, parseInt(val.toString())));
+    setExportQuality(quality / 100);
+
+    // Update modal elements
+    const valEl = document.getElementById('modalQualityVal');
+    if (valEl) valEl.textContent = quality + '%';
+
+    const slider = document.getElementById('modalQualitySlider') as HTMLInputElement;
+    if (slider) slider.value = quality.toString();
+
+    // If modal is open, update preview
+    if (!document.getElementById('exportModal')?.classList.contains('hidden')) {
+        updateExportPreview();
+    }
 }
 
 
@@ -202,7 +254,27 @@ function attachEventListeners() {
     signaturePad.addEventListener("beginStroke", () => {
         if (State.currentMode === 'select' || State.isMoving || State.isResizing || State.isRotating) return;
         saveState();
-        if (hint) hint.classList.add('hidden');
+        updateHintVisibility(true);
+    });
+
+    // Ensure hint is updated after any drawing operation
+    signaturePad.addEventListener("afterUpdate", () => {
+        updateHintVisibility();
+    });
+
+    signaturePad.addEventListener("endStroke", () => {
+        const data = signaturePad.toData();
+        if (data.length > 0) {
+            const last = data[data.length - 1] as any;
+            last.strokeType = State.currentStrokeType;
+            last.isUniform = State.isUniform;
+            // Ensure color is persisted in both standard and custom properties
+            last.penColor = signaturePad.penColor;
+            last.color = signaturePad.penColor;
+
+            // Re-render with high-quality Advanced Renderer
+            safeFromData(data);
+        }
     });
 
 
@@ -214,10 +286,55 @@ function attachEventListeners() {
         // Ensure visibility
         if (!isMinimized) {
             sidePanel.style.display = 'flex';
+
+            // Progressive loading of panel sections
+            const groupStroke = document.getElementById('groupStroke');
+            const groupTransform = document.getElementById('groupTransform');
+            const groupCanvas = document.getElementById('groupCanvas');
+
+            // Hide all sections initially
+            if (groupStroke) groupStroke.style.display = 'none';
+            if (groupTransform) groupTransform.style.display = 'none';
+            if (groupCanvas) groupCanvas.style.display = 'none';
+
             requestAnimationFrame(() => {
                 sidePanel.style.opacity = '1';
                 sidePanel.style.transform = sidePanel.classList.contains('docked') ? 'none' : 'translateX(0)';
                 updateWorkspaceLayout();
+
+                // Load sections progressively
+                setTimeout(() => {
+                    if (groupStroke) {
+                        groupStroke.style.display = 'block';
+                        groupStroke.style.opacity = '0';
+                        requestAnimationFrame(() => {
+                            groupStroke.style.transition = 'opacity 0.2s ease-in';
+                            groupStroke.style.opacity = '1';
+                        });
+                    }
+                }, 50);
+
+                setTimeout(() => {
+                    if (groupTransform) {
+                        groupTransform.style.display = 'block';
+                        groupTransform.style.opacity = '0';
+                        requestAnimationFrame(() => {
+                            groupTransform.style.transition = 'opacity 0.2s ease-in';
+                            groupTransform.style.opacity = '1';
+                        });
+                    }
+                }, 150);
+
+                setTimeout(() => {
+                    if (groupCanvas) {
+                        groupCanvas.style.display = 'block';
+                        groupCanvas.style.opacity = '0';
+                        requestAnimationFrame(() => {
+                            groupCanvas.style.transition = 'opacity 0.2s ease-in';
+                            groupCanvas.style.opacity = '1';
+                        });
+                    }
+                }, 250);
             });
         } else {
             updateWorkspaceLayout();
@@ -236,11 +353,13 @@ function attachEventListeners() {
 
 
 
-    document.getElementById('recenterBtnTop')?.addEventListener('click', () => {
+    document.getElementById('centerCanvasBtn')?.addEventListener('click', () => {
         autoAdjustCanvas();
     });
 
-
+    window.addEventListener('resize', () => {
+        updateWorkspaceLayout();
+    });
 }
 
 function attachDynamicListeners() {
@@ -258,9 +377,41 @@ function attachDynamicListeners() {
 
         const colorDot = target.closest('.color-dot') as HTMLElement;
         if (colorDot) {
-            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+            const picker = colorDot.parentElement!;
+            picker.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
             colorDot.classList.add('active');
-            applyColor(colorDot.getAttribute('data-color')!);
+            const color = colorDot.getAttribute('data-color')!;
+
+            if (picker.id === 'colorPicker') {
+                applyColor(color);
+            } else if (picker.id === 'canvasBgPicker') {
+                if (container) {
+                    container.dataset.bgColor = color;
+                    updateCanvasBackground();
+                }
+            } else if (picker.id === 'canvasBorderColorPicker') {
+                if (container) {
+                    setCanvasBorderColor(color);
+                    updateCanvasBorder();
+                }
+            } else if (picker.id === 'converterColorPicker') {
+                const converter = pageRouter.getConverterInstance();
+                if (converter) {
+                    converter.updateFilterColor(color);
+                }
+            }
+
+            // If a standard dot is selected, clear the custom color for this picker
+            if (!colorDot.classList.contains('custom-selected-dot')) {
+                customColors[picker.id] = '';
+                picker.querySelector('.custom-selected-dot')?.classList.add('hidden');
+            }
+        }
+
+        const customBtn = target.closest('.custom-color-btn') as HTMLElement;
+        if (customBtn) {
+            activePickerId = customBtn.parentElement!.id;
+            openAdvancedPicker();
         }
 
         const langBtn = target.closest('.lang-btn') as HTMLElement;
@@ -272,8 +423,35 @@ function attachDynamicListeners() {
             attachControlListeners();
         }
 
+        const borderTypeBtn = target.closest('#borderTypePresets .preset-btn') as HTMLElement;
+        if (borderTypeBtn) {
+            document.querySelectorAll('#borderTypePresets .preset-btn').forEach(b => b.classList.remove('active'));
+            borderTypeBtn.classList.add('active');
+            if (container) {
+                setCanvasBorderStyle(borderTypeBtn.dataset.borderType!);
+                updateCanvasBorder();
+            }
+        }
+
+        const radiusUnitBtn = target.closest('#radiusUnitToggle .unit-btn') as HTMLElement;
+        if (radiusUnitBtn) {
+            document.querySelectorAll('#radiusUnitToggle .unit-btn').forEach(b => b.classList.remove('active'));
+            radiusUnitBtn.classList.add('active');
+            setRadiusUnit(radiusUnitBtn.dataset.unit || 'px');
+            const radiusSlider = document.getElementById('radiusSlider') as HTMLInputElement;
+            if (radiusSlider) {
+                const val = radiusSlider.value + State.currentRadiusUnit;
+                const radiusVal = document.getElementById('radiusVal');
+                if (radiusVal) radiusVal.textContent = val;
+                updateCanvasBorder();
+            }
+        }
+
         const sizePresetBtn = target.closest('#canvasSizePresets .preset-btn') as HTMLElement;
         if (sizePresetBtn) {
+            document.querySelectorAll('#canvasSizePresets .preset-btn').forEach(b => b.classList.remove('active'));
+            sizePresetBtn.classList.add('active');
+
             const size = sizePresetBtn.dataset.size;
             const updateCanvasW = (val: number) => { if (container) container.style.width = val + 'px'; syncSizeValues(); resizeCanvas(); };
             const updateCanvasH = (val: number) => { if (container) container.style.height = val + 'px'; syncSizeValues(); resizeCanvas(); };
@@ -282,31 +460,81 @@ function attachDynamicListeners() {
             else if (size === 'large') { updateCanvasW(1600); updateCanvasH(800); }
         }
 
-        if (target.closest('#copyPngBtn')) copyPngToClipboard();
-        if (target.closest('#downloadPngBtn')) downloadPng();
-        if (target.closest('#downloadSvgBtn')) downloadSvg();
-
-        const exportMainBtn = target.closest('#exportMainBtn');
-        if (exportMainBtn) {
-            const dropdown = document.getElementById('exportDropdown');
-            if (dropdown) dropdown.classList.toggle('active');
-        } else if (!target.closest('#exportDropdown')) {
-            const dropdown = document.getElementById('exportDropdown');
-            if (dropdown) dropdown.classList.remove('active');
+        const dpiPresetBtn = target.closest('.dpi-presets .preset-btn') as HTMLElement;
+        if (dpiPresetBtn) {
+            updateExportDpi(dpiPresetBtn.dataset.dpi!);
         }
+
+        if (target.closest('#exportMainBtn')) triggerExport();
+
+        const formatBtn = target.closest('#modalFormatSelector .preset-btn') as HTMLElement;
+        if (formatBtn) {
+            setExportFormat(formatBtn.dataset.format!);
+            document.querySelectorAll('#modalFormatSelector .preset-btn').forEach(b => b.classList.remove('active'));
+            formatBtn.classList.add('active');
+            updateModalContext();
+            updateExportPreview();
+        }
+
+        const actionBtn = target.closest('#modalActionSelector .preset-btn') as HTMLElement;
+        if (actionBtn) {
+            setExportAction(actionBtn.dataset.action!);
+            document.querySelectorAll('#modalActionSelector .preset-btn').forEach(b => b.classList.remove('active'));
+            actionBtn.classList.add('active');
+            updateModalContext();
+            updateExportPreview();
+        }
+
+        if (target.closest('#closeExportModal')) {
+            document.getElementById('exportModal')?.classList.add('hidden');
+            setWorkspaceActive(true);
+        }
+
+        if (target.closest('#finalExportBtn')) {
+            const format = State.exportFormat;
+            const action = State.exportAction;
+
+            document.getElementById('exportModal')?.classList.add('hidden');
+            setWorkspaceActive(true);
+
+            if (action === 'download') {
+                if (format === 'PNG') downloadPng();
+                else if (format === 'SVG') downloadSvg();
+                else if (format === 'JPG') downloadJpg();
+                else if (format === 'WEBP') downloadWebp();
+                else if (format === 'BMP') downloadBmp();
+                else if (format === 'TIFF') downloadTiff();
+            } else if (action === 'copy') {
+                if (format === 'PNG') copyPngToClipboard();
+                else if (format === 'SVG') copySvgBase64(); // SVG copy usually base64 text or blob
+                else if (format === 'JPG') copyJpgBase64();
+                else if (format === 'WEBP') copyWebpBase64();
+                else showToast("Función 'Copiar' no disponible para " + format, "#f59e0b");
+            } else if (action === 'base64') {
+                if (format === 'PNG') copyPngBase64();
+                else if (format === 'SVG') copySvgBase64();
+                else if (format === 'JPG') copyJpgBase64();
+                else if (format === 'WEBP') copyWebpBase64();
+                else showToast("Base64 no disponible para " + format, "#f59e0b");
+            }
+        }
+
+
 
         if (target.closest('#undoBtn')) undo();
         if (target.closest('#redoBtn')) redo();
         if (target.closest('#clearBtn')) {
-            if (!signaturePad.isEmpty()) {
+            const data = signaturePad.toData();
+            if (data.length > 0) {
                 saveState();
-                signaturePad.clear();
-                if (hint) hint.classList.remove('hidden');
+                signaturePad.clear(); // Patched clear in workspace.ts handles physical canvas and sctx
+                updateHintVisibility();
                 deselectStroke(false);
+                updateHistoryButtons();
             }
         }
 
-        if (target.closest('#centerCanvasBtn')) recenterCanvas();
+        if (target.closest('#centerCanvasBtn')) autoAdjustCanvas();
         if (target.closest('#resetSizeBtn')) autoAdjustCanvas();
 
         const fullscreenBtn = target.closest('#fullscreenBtn');
@@ -349,8 +577,20 @@ function attachControlListeners() {
         applyColor(lastBaseColor);
     });
 
+    document.getElementById('uniformToggle')?.addEventListener('change', (e: any) => {
+        updateUniform(e.target.checked);
+    });
+
+    document.getElementById('smoothingSlider')?.addEventListener('input', (e: any) => {
+        updateSmoothing(parseFloat(e.target.value));
+    });
+
+    document.getElementById('colorQualitySlider')?.addEventListener('input', (e: any) => {
+        updateColorQuality(parseFloat(e.target.value));
+    });
+
     const updateCanvasW = (w: any) => {
-        const val = Math.max(200, Math.min(2000, parseInt(w)));
+        const val = Math.max(20, Math.min(2000, parseInt(w)));
         if (container) container.style.width = val + 'px';
         const wVal = document.getElementById('canvasWidthVal') as HTMLInputElement;
         const wSlider = document.getElementById('widthSlider') as HTMLInputElement;
@@ -359,7 +599,7 @@ function attachControlListeners() {
         syncSizeValues(); resizeCanvas();
     };
     const updateCanvasH = (h: any) => {
-        const val = Math.max(100, Math.min(1000, parseInt(h)));
+        const val = Math.max(20, Math.min(1000, parseInt(h)));
         if (container) container.style.height = val + 'px';
         const hVal = document.getElementById('canvasHeightVal') as HTMLInputElement;
         const hSlider = document.getElementById('heightSlider') as HTMLInputElement;
@@ -412,6 +652,57 @@ function attachControlListeners() {
     setupContinuousClick('incZoom', () => updateZoom((State.workspaceScale * 100) + 1));
     setupContinuousClick('decZoom', () => updateZoom((State.workspaceScale * 100) - 1));
     setupScrubbing('zoomScrubArea', () => State.workspaceScale * 100, (v) => updateZoom(v), 1);
+
+    document.getElementById('bgOpacitySlider')?.addEventListener('input', (e: any) => {
+        const val = e.target.value;
+        setBgOpacity(parseFloat(val) / 100);
+        updateCanvasBackground();
+        const bgOpacityVal = document.getElementById('bgOpacityVal');
+        if (bgOpacityVal) bgOpacityVal.textContent = val + '%';
+    });
+
+    document.getElementById('borderOpacitySlider')?.addEventListener('input', (e: any) => {
+        const val = e.target.value;
+        setBorderOpacity(parseFloat(val) / 100);
+        updateCanvasBorder();
+        const borderOpacityVal = document.getElementById('borderOpacityVal');
+        if (borderOpacityVal) borderOpacityVal.textContent = val + '%';
+    });
+    
+    document.getElementById('borderOffsetSlider')?.addEventListener('input', (e: any) => {
+        const val = e.target.value;
+        setBorderOffset(parseFloat(val));
+        updateCanvasBorder();
+        const borderOffsetVal = document.getElementById('borderOffsetVal');
+        if (borderOffsetVal) borderOffsetVal.textContent = val + 'px';
+    });
+
+    document.getElementById('radiusSlider')?.addEventListener('input', (e: any) => {
+        const val = e.target.value;
+        if (container) {
+            container.style.borderRadius = val + State.currentRadiusUnit;
+            updateCanvasBorder();
+        }
+        const radiusVal = document.getElementById('radiusVal');
+        if (radiusVal) radiusVal.textContent = val + State.currentRadiusUnit;
+    });
+
+    document.getElementById('borderWidthSlider')?.addEventListener('input', (e: any) => {
+        const val = e.target.value + 'px';
+        if (container) {
+            container.style.borderWidth = val;
+            updateCanvasBorder();
+        }
+        const borderWidthVal = document.getElementById('borderWidthVal');
+        if (borderWidthVal) borderWidthVal.textContent = val;
+    });
+
+    document.getElementById('borderDashSlider')?.addEventListener('input', (e: any) => {
+        const val = e.target.value + 'px';
+        updateCanvasBorder();
+        const borderDashVal = document.getElementById('borderDashVal');
+        if (borderDashVal) borderDashVal.textContent = val;
+    });
 
     document.getElementById('rotateLeftBtn')?.addEventListener('click', () => rotateSelection90('ccw'));
     document.getElementById('rotateRightBtn')?.addEventListener('click', () => rotateSelection90('cw'));
@@ -467,19 +758,706 @@ function attachControlListeners() {
         document.body.classList.toggle('dark-mode', e.target.checked);
         document.body.classList.toggle('light-mode', !e.target.checked);
     });
+
+    document.getElementById('modalQualitySlider')?.addEventListener('input', (e: any) => updateExportQuality(e.target.value));
+
+    const modalDpiValEl = document.getElementById('modalDpiVal') as HTMLInputElement;
+    if (modalDpiValEl) modalDpiValEl.onchange = (e: any) => updateExportDpi(e.target.value);
+
+    setupContinuousClick('incModalDpi', () => updateExportDpi(State.exportDpi + 10));
+    setupContinuousClick('decModalDpi', () => updateExportDpi(State.exportDpi - 10));
+    setupScrubbing('modalDpiScrubArea', () => State.exportDpi, (v) => updateExportDpi(v), 2);
+
+    document.getElementById('modalClipToggle')?.addEventListener('change', (e: any) => {
+        setExportClipOutOfBounds(e.target.checked);
+        updateExportPreview();
+    });
+
+    document.getElementById('viewClipToggle')?.addEventListener('change', (e: any) => {
+        setViewClipOutOfBounds(e.target.checked);
+        updateWorkspaceView();
+    });
+
+    document.getElementById('gridToggle')?.addEventListener('change', (e: any) => {
+        setShowGrid(e.target.checked);
+        updateWorkspaceView();
+    });
+
+    // --- New Export Controls ---
+    // --- New Export Controls ---
+    // --- New Export Controls ---
+    const toggleDpiInput = (enable: boolean) => {
+        const input = document.getElementById('modalDpiVal') as HTMLInputElement;
+        const inc = document.getElementById('incModalDpi') as HTMLButtonElement;
+        const dec = document.getElementById('decModalDpi') as HTMLButtonElement;
+        const scrub = document.getElementById('modalDpiScrubArea');
+
+        if (input) input.disabled = !enable;
+        if (inc) inc.disabled = !enable;
+        if (dec) dec.disabled = !enable;
+        if (scrub) scrub.style.pointerEvents = enable ? 'auto' : 'none';
+        if (scrub) scrub.style.opacity = enable ? '1' : '0.5';
+    };
+
+    // Initialize as disabled
+    toggleDpiInput(false);
+
+    // Unified Preset Listener
+    document.querySelectorAll('.dpi-presets .preset-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const b = e.currentTarget as HTMLElement;
+            const dpiData = b.dataset.dpi;
+
+            // Update active state
+            document.querySelectorAll('.dpi-presets .preset-btn').forEach(el => el.classList.remove('active'));
+            b.classList.add('active');
+
+            if (dpiData === 'CUSTOM') {
+                toggleDpiInput(true);
+                setExportPreset('CUSTOM');
+            } else {
+                toggleDpiInput(false);
+                setExportPreset(dpiData || 'DEFAULT');
+            }
+            updateExportPreview();
+        });
+    });
+
+    // Removed setDpiForResolution as it's no longer used for automatic conversion
+
+
+    const updateMargin = (val: number) => {
+        setExportMargin(val);
+        const el = document.getElementById('modalMarginVal');
+        if (el) el.textContent = val + 'px';
+        updateExportPreview();
+    };
+    document.getElementById('modalMarginSlider')?.addEventListener('input', (e: any) => updateMargin(parseInt(e.target.value)));
+
+    const updateExportScale = (val: number) => {
+        const v = parseFloat(val.toString());
+        const final = Math.max(0.5, Math.min(10, v));
+        setExportScale(final);
+        const el = document.getElementById('modalScaleVal');
+        if (el) el.innerText = final + 'x';
+        updateExportPreview();
+    };
+    document.getElementById('modalScaleSlider')?.addEventListener('input', (e: any) => updateExportScale(parseFloat(e.target.value)));
+
+    // Explicit listeners for Action and Format selectors if not already covered
+    document.querySelectorAll('#modalActionSelector .preset-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            const action = target.dataset.action;
+            if (action) {
+                setExportAction(action);
+                // Update active state
+                document.querySelectorAll('#modalActionSelector .preset-btn').forEach(b => b.classList.remove('active'));
+                target.classList.add('active');
+
+                // Update Icon
+                const finalBtn = document.getElementById('finalExportBtn');
+                if (finalBtn) {
+                    const iconName = action === 'download' ? 'download' : (action === 'copy' ? 'copy' : 'file-code');
+                    // Remove existing icon (SVG or i)
+                    const oldIcon = finalBtn.querySelector('i, svg');
+                    if (oldIcon) oldIcon.remove();
+
+                    // Add new icon
+                    const i = document.createElement('i');
+                    i.setAttribute('data-lucide', iconName);
+                    finalBtn.prepend(i);
+                    createIcons(); // content is updated
+                }
+                updateModalContext();
+            }
+        });
+    });
+
+    document.querySelectorAll('#modalFormatSelector .preset-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            const format = target.dataset.format;
+            if (format) {
+                setExportFormat(format);
+                document.querySelectorAll('#modalFormatSelector .preset-btn').forEach(b => b.classList.remove('active'));
+                target.classList.add('active');
+                updateModalContext();
+                updateExportPreview();
+            }
+        });
+    });
+
+    updateWorkspaceView(); // Initialize state
+
+    // Capture points outside canvas during drawing
+    const mainCanvas = document.getElementById('signatureCanvas');
+    if (mainCanvas) {
+        mainCanvas.addEventListener('pointerdown', (e) => {
+            (mainCanvas as HTMLElement).setPointerCapture(e.pointerId);
+        });
+    }
+}
+
+export function updateWorkspaceView() {
+    if (container) container.classList.toggle('clipped', State.viewClipOutOfBounds);
+    if (workspace) workspace.classList.toggle('show-grid', State.showGrid);
+}
+
+function updateCanvasBackground() {
+    if (!colorLayer || !container) return;
+    const bgColor = container.dataset.bgColor || 'transparent';
+    // If it's hex, convert to rgba. If it's already rgba, we replace the alpha.
+    const finalColor = applyAlpha(bgColor, State.bgOpacity);
+    colorLayer.style.backgroundColor = finalColor;
+    // Keep container transparent so we see the premium background through it
+    container.style.backgroundColor = 'transparent';
+}
+
+function applyAlpha(color: string, alpha: number) {
+    if (!color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)') {
+        return 'rgba(0, 0, 0, 0)';
+    }
+    if (color.startsWith('rgba')) {
+        return color.replace(/[\d\.]+\)$/g, `${alpha})`);
+    } else if (color.startsWith('#')) {
+        return hexToRgba(color, alpha);
+    } else if (color.startsWith('rgb')) {
+        return color.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
+    }
+    return color;
+}
+
+function hexToRgba(hex: string, alpha: number) {
+    let r = 0, g = 0, b = 0;
+    if (hex.length === 4) {
+        r = parseInt(hex[1] + hex[1], 16);
+        g = parseInt(hex[2] + hex[2], 16);
+        b = parseInt(hex[3] + hex[3], 16);
+    } else if (hex.length === 7) {
+        r = parseInt(hex.slice(1, 3), 16);
+        g = parseInt(hex.slice(3, 5), 16);
+        b = parseInt(hex.slice(5, 7), 16);
+    }
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// --- Resize Handling for SVG Border ---
+const borderResizeObserver = new ResizeObserver(() => {
+    updateCanvasBorder();
+});
+
+function updateCanvasBorder() {
+    if (!container) return;
+    
+    // Connect observer if not already
+    borderResizeObserver.observe(container);
+    
+    const style = State.currentCanvasBorderStyle;
+    const color = applyAlpha(State.currentCanvasBorderColor, State.borderOpacity);
+    const widthRaw = (document.getElementById('borderWidthSlider') as HTMLInputElement)?.value || '1';
+    const radiusRaw = (document.getElementById('radiusSlider') as HTMLInputElement)?.value || '0';
+    const dashRaw = (document.getElementById('borderDashSlider') as HTMLInputElement)?.value || '4';
+    const offsetRaw = (document.getElementById('borderOffsetSlider') as HTMLInputElement)?.value || '0';
+    
+    const w = parseFloat(widthRaw);
+    const dashVal = parseFloat(dashRaw);
+    const offset = parseFloat(offsetRaw);
+    const isNone = style === 'none';
+    
+    // UI Updates
+    const dashSlider = document.getElementById('borderDashSlider') as HTMLInputElement;
+    if (dashSlider) dashSlider.disabled = (style === 'solid' || isNone);
+
+    const widthSlider = document.getElementById('borderWidthSlider') as HTMLInputElement;
+    const radiusSlider = document.getElementById('radiusSlider') as HTMLInputElement;
+    const borderOpacitySlider = document.getElementById('borderOpacitySlider') as HTMLInputElement;
+    const borderColorPicker = document.getElementById('canvasBorderColorPicker') as HTMLElement;
+
+    if (widthSlider) widthSlider.disabled = isNone;
+    if (radiusSlider) radiusSlider.disabled = isNone;
+    if (borderOpacitySlider) borderOpacitySlider.disabled = isNone;
+    if (borderColorPicker) {
+        borderColorPicker.style.pointerEvents = isNone ? 'none' : 'auto';
+        borderColorPicker.style.opacity = isNone ? '0.5' : '1';
+    }
+
+    const radiusWithUnit = radiusRaw + State.currentRadiusUnit;
+    container.style.borderRadius = radiusWithUnit;
+
+    if (isNone) {
+        container.style.border = 'none';
+        container.style.backgroundImage = 'none';
+        if (colorLayer) colorLayer.style.backgroundImage = 'none';
+        return;
+    }
+
+    // We remove the native border to ensure the background/lienzo fills the whole container
+    container.style.border = 'none';
+    container.style.backgroundImage = 'none';
+    
+    let dashArray = 'none';
+    if (style === 'dashed') dashArray = `${dashVal}, ${dashVal * 0.8}`;
+    else if (style === 'dotted') dashArray = `${Math.max(1, w/2)}, ${dashVal}`;
+
+    const cw = Math.round(container.offsetWidth);
+    const ch = Math.round(container.offsetHeight);
+    if (cw === 0 || ch === 0) return;
+
+    const radiusPx = State.currentRadiusUnit === '%' 
+        ? (parseFloat(radiusRaw) / 100) * Math.min(cw, ch) 
+        : parseFloat(radiusRaw);
+
+    // Technique: Draw the stroke perfectly inside the container by insetting the rect
+    // Offset property: increases the inset
+    const inset = (w / 2) + offset;
+    const finalSvg = `
+        <svg xmlns='http://www.w3.org/2000/svg' width='${cw}' height='${ch}'>
+            <rect x='${inset}' y='${inset}' width='${Math.max(0, cw - w - (offset * 2))}' height='${Math.max(0, ch - w - (offset * 2))}' 
+                  fill='none' stroke='${color}' stroke-width='${w}' stroke-dasharray='${dashArray}' 
+                  stroke-linecap='${style === 'dotted' ? 'round' : 'square'}'
+                  rx='${Math.max(0, radiusPx - offset)}' ry='${Math.max(0, radiusPx - offset)}'/>
+        </svg>
+    `.trim().replace(/\n/g, '').replace(/\s+/g, ' ');
+
+    if (colorLayer) {
+        colorLayer.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(finalSvg)}")`;
+        colorLayer.style.backgroundRepeat = 'no-repeat';
+        colorLayer.style.backgroundPosition = 'center';
+        colorLayer.style.backgroundSize = '100% 100%';
+    }
+}
+
+// --- Advanced Color Picker Logic ---
+
+// --- Floating Window Logic ---
+
+function makeDraggable(windowId: string) {
+    const picker = document.getElementById(windowId);
+    if (!picker) return;
+
+    // Use header if available, otherwise the element itself (fallback)
+    const handle = picker.querySelector('.window-header') || picker;
+
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    // We store initial offsets relative to the viewport
+    let initialLeft = 0, initialTop = 0;
+
+    handle.addEventListener('pointerdown', (e: any) => {
+        // Ignore clicks on buttons/inputs inside the header
+        if (e.target.closest('button') || e.target.closest('input')) return;
+
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        const rect = picker.getBoundingClientRect();
+        // Since we use transform translate(-50%, -50%) for centering, 'left' and 'top' should track the center point
+        // BUT if it's not centered via transform, we need to adapt.
+        // Assuming the CSS uses: top: 50%; left: 50%; transform: translate(-50%, -50%);
+        // We will switch to direct pixel positioning on drag start to avoid transform complexity, or just update top/left.
+        // Let's stick to updating top/left assuming they are the center point if transform is present.
+
+        // Actually, let's keep it simple: Calculate the current visual top/left and map it.
+        // If transform is present, the 'left/top' style properties might be percentage based initially.
+        // We will convert them to pixels on start.
+
+        // Simpler approach: 
+        // 1. Get current visual rect.
+        // 2. Set margins to 0 and transform to none to take full manual control.
+        // 3. Set top/left to the current rect position.
+
+        // However, this might break centering logic if resizing happens. 
+        // Let's stick to the existing logic but clamp the result.
+
+        // Existing logic uses: 
+        // initialX = rect.left + rect.width / 2;
+        // initialY = rect.top + rect.height / 2;
+        // picker.style.left = ...
+
+        // Let's refine that.
+        initialLeft = rect.left;
+        initialTop = rect.top;
+
+        // We need to account for the fact that setting 'left' might move the element differently if 'transform' is active.
+        // If transform is translate(-50%, -50%), then setting left=X puts the center at X.
+        // The existing code: picker.style.left = `${initialX + dx}px` implies setting center.
+
+        // Let's detect if transform is active.
+        // If we want to constrain it, we need to know the dimensions.
+
+        // If we want to constrain it, we need to know the dimensions.
+        handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener('pointermove', (e: any) => {
+        if (!isDragging) return;
+        e.preventDefault();
+
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        const rect = picker.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+
+        let newLeft = initialLeft + dx;
+        let newTop = initialTop + dy;
+
+        // Constrain to viewport
+        const viewportW = window.innerWidth;
+        const viewportH = window.innerHeight;
+
+        // Clamp (newLeft, newTop) ensures the top-left corner is within [0, W-w] and [0, H-h]
+        newLeft = Math.max(0, Math.min(newLeft, viewportW - width));
+        newTop = Math.max(0, Math.min(newTop, viewportH - height));
+
+        // Now apply to the element. 
+        // If the element has transform: translate(-50%, -50%), then 'left' needs to be center.
+        // rect.left is the visual left edge.
+        // If we want visual left edge to be 'newLeft', and we have translate(-50%), 
+        // then style.left should be newLeft + width/2.
+
+        picker.style.margin = '0'; // Clear auto margins if any
+        picker.style.transform = 'translate(0, 0)'; // Remove centering transform to simplify positioning
+        picker.style.left = `${newLeft}px`;
+        picker.style.top = `${newTop}px`;
+    });
+
+    handle.addEventListener('pointerup', (e: any) => {
+        isDragging = false;
+        handle.releasePointerCapture(e.pointerId);
+    });
+}
+
+let refreshAdvancedPicker: (() => void) | null = null;
+function initAdvancedPicker() {
+    const picker = document.getElementById('advancedColorPicker');
+    const closeBtn = document.getElementById('closeAdvancedPicker');
+    const addFavBtn = document.getElementById('addFavoriteBtn');
+
+    makeDraggable('advancedColorPicker');
+
+    closeBtn?.addEventListener('click', () => {
+        picker?.classList.add('hidden');
+        setWorkspaceActive(true);
+    });
+
+    addFavBtn?.addEventListener('click', () => {
+        const color = hexInput.value.toUpperCase();
+        if (!favoriteColors.includes(color)) {
+            if (favoriteColors.length >= 4) {
+                showToast(i18n[currentLang as keyof typeof i18n].toastMaxFavorites, "#f59e0b");
+                return;
+            }
+            setFavoriteColors([...favoriteColors, color]);
+            renderAdvancedFavorites();
+            renderUIComponents();
+            updateGlobalReferences();
+            createIcons();
+        }
+    });
+
+    const canvas = document.getElementById('colorCanvas') as HTMLCanvasElement;
+    const hueSlider = document.getElementById('hueSlider') as HTMLInputElement;
+    const rInput = document.getElementById('rInput') as HTMLInputElement;
+    const gInput = document.getElementById('gInput') as HTMLInputElement;
+    const bInput = document.getElementById('bInput') as HTMLInputElement;
+    const hexInput = document.getElementById('hexInput') as HTMLInputElement;
+    const applyBtn = document.getElementById('applyAdvancedColor');
+
+    function updateFromHSB() {
+        const rgb = hsbToRgb(currentPickerColor.h, currentPickerColor.s, currentPickerColor.v);
+        rInput.value = rgb.r.toString();
+        gInput.value = rgb.g.toString();
+        bInput.value = rgb.b.toString();
+        const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+        hexInput.value = hex.toUpperCase();
+        document.getElementById('currentColorPreview')!.style.backgroundColor = hex;
+        renderColorCanvas();
+        updateCursorPosition();
+    }
+
+    canvas?.addEventListener('pointerdown', (e) => {
+        const onMove = (pe: PointerEvent) => {
+            const rect = canvas.getBoundingClientRect();
+            let x = Math.max(0, Math.min(rect.width, pe.clientX - rect.left));
+            let y = Math.max(0, Math.min(rect.height, pe.clientY - rect.top));
+            currentPickerColor.s = (x / rect.width) * 100;
+            currentPickerColor.v = 100 - (y / rect.height) * 100;
+            updateFromHSB();
+        };
+        onMove(e);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', () => window.removeEventListener('pointermove', onMove), { once: true });
+    });
+
+    hueSlider?.addEventListener('input', (e: any) => {
+        currentPickerColor.h = parseInt(e.target.value);
+        updateFromHSB();
+    });
+
+    [rInput, gInput, bInput].forEach(inp => {
+        inp.addEventListener('change', () => {
+            const r = parseInt(rInput.value), g = parseInt(gInput.value), b = parseInt(bInput.value);
+            const hsb = rgbToHsb(r, g, b);
+            currentPickerColor = hsb;
+            hueSlider.value = hsb.h.toString();
+            updateFromHSB();
+        });
+
+        // Custom arrows logic
+        const arrows = inp.parentElement!.querySelector('.input-arrows');
+        arrows?.querySelector('.arrow-up')?.addEventListener('click', () => {
+            inp.value = Math.min(255, parseInt(inp.value || '0') + 1).toString();
+            inp.dispatchEvent(new Event('change'));
+        });
+        arrows?.querySelector('.arrow-down')?.addEventListener('click', () => {
+            inp.value = Math.max(0, parseInt(inp.value || '0') - 1).toString();
+            inp.dispatchEvent(new Event('change'));
+        });
+    });
+
+    hexInput?.addEventListener('change', () => {
+        const rgb = hexToRgb(hexInput.value);
+        if (rgb) {
+            const hsb = rgbToHsb(rgb.r, rgb.g, rgb.b);
+            currentPickerColor = hsb;
+            hueSlider.value = hsb.h.toString();
+            updateFromHSB();
+        }
+    });
+
+    applyBtn?.addEventListener('click', () => {
+        const color = hexInput.value;
+        applySelectedColor(color);
+        picker?.classList.add('hidden');
+        setWorkspaceActive(true);
+    });
+
+    refreshAdvancedPicker = updateFromHSB;
+    renderColorCanvas();
+    renderAdvancedFavorites();
+}
+
+function renderAdvancedFavorites() {
+    const container = document.getElementById('advancedFavorites');
+    if (!container) return;
+
+    container.innerHTML = favoriteColors.map((color, index) => `
+        <div class="fav-item" data-index="${index}">
+            <div class="fav-dot" style="background: ${color};" data-color="${color}"></div>
+            <div class="fav-controls">
+                <button class="fav-action move-left" title="Mover izquierda">
+                    <i data-lucide="chevron-left"></i>
+                </button>
+                <button class="fav-action remove-fav" title="Eliminar">
+                    <i data-lucide="x"></i>
+                </button>
+                <button class="fav-action move-right" title="Mover derecha">
+                    <i data-lucide="chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    createIcons();
+
+    container.querySelectorAll('.fav-dot').forEach(dot => {
+        dot.addEventListener('click', (e: any) => {
+            const color = e.target.dataset.color;
+            const rgb = hexToRgb(color);
+            if (rgb) {
+                currentPickerColor = rgbToHsb(rgb.r, rgb.g, rgb.b);
+                const hueSlider = document.getElementById('hueSlider') as HTMLInputElement;
+                hueSlider.value = currentPickerColor.h.toString();
+
+                // Trigger update
+                const rInput = document.getElementById('rInput') as HTMLInputElement;
+                const gInput = document.getElementById('gInput') as HTMLInputElement;
+                const bInput = document.getElementById('bInput') as HTMLInputElement;
+                const hexInput = document.getElementById('hexInput') as HTMLInputElement;
+
+                const rgbVal = hsbToRgb(currentPickerColor.h, currentPickerColor.s, currentPickerColor.v);
+                rInput.value = rgbVal.r.toString();
+                gInput.value = rgbVal.g.toString();
+                bInput.value = rgbVal.b.toString();
+                hexInput.value = color.toUpperCase();
+                document.getElementById('currentColorPreview')!.style.backgroundColor = color;
+
+                renderColorCanvas();
+                updateCursorPosition();
+            }
+        });
+    });
+
+    container.querySelectorAll('.fav-action').forEach(btn => {
+        btn.addEventListener('click', (e: any) => {
+            e.stopPropagation();
+            const item = btn.closest('.fav-item') as HTMLElement;
+            const index = parseInt(item.dataset.index!);
+            let newFavs = [...favoriteColors];
+
+            if (btn.classList.contains('remove-fav')) {
+                newFavs.splice(index, 1);
+            } else if (btn.classList.contains('move-left') && index > 0) {
+                [newFavs[index - 1], newFavs[index]] = [newFavs[index], newFavs[index - 1]];
+            } else if (btn.classList.contains('move-right') && index < newFavs.length - 1) {
+                [newFavs[index + 1], newFavs[index]] = [newFavs[index], newFavs[index + 1]];
+            }
+
+            setFavoriteColors(newFavs);
+            renderAdvancedFavorites();
+            renderUIComponents();
+            updateGlobalReferences();
+        });
+    });
+}
+
+function renderColorCanvas() {
+    const canvas = document.getElementById('colorCanvas') as HTMLCanvasElement;
+    const ctx = canvas?.getContext('2d');
+    if (!ctx) return;
+    const w = canvas.width, h = canvas.height;
+
+    ctx.fillStyle = `hsl(${currentPickerColor.h}, 100%, 50%)`;
+    ctx.fillRect(0, 0, w, h);
+
+    const whiteGrad = ctx.createLinearGradient(0, 0, w, 0);
+    whiteGrad.addColorStop(0, '#fff');
+    whiteGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = whiteGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    const blackGrad = ctx.createLinearGradient(0, 0, 0, h);
+    blackGrad.addColorStop(0, 'transparent');
+    blackGrad.addColorStop(1, '#000');
+    ctx.fillStyle = blackGrad;
+    ctx.fillRect(0, 0, w, h);
+}
+
+function updateCursorPosition() {
+    const cursor = document.getElementById('colorCursor');
+    if (cursor) {
+        cursor.style.left = `${currentPickerColor.s}%`;
+        cursor.style.top = `${100 - currentPickerColor.v}%`;
+    }
+}
+
+function openAdvancedPicker() {
+    if (!activePickerId) return;
+
+    // Get current color from custom or default
+    let color = customColors[activePickerId];
+    if (!color) {
+        if (activePickerId === 'colorPicker') color = '#ffffff';
+        else if (activePickerId === 'canvasBgPicker') color = '#0f172a';
+        else color = '#ffffff';
+    }
+
+    const rgb = hexToRgb(color);
+    if (rgb) {
+        currentPickerColor = rgbToHsb(rgb.r, rgb.g, rgb.b);
+        const hueSlider = document.getElementById('hueSlider') as HTMLInputElement;
+        if (hueSlider) hueSlider.value = currentPickerColor.h.toString();
+        if (refreshAdvancedPicker) refreshAdvancedPicker();
+    }
+
+    document.getElementById('advancedColorPicker')?.classList.remove('hidden');
+    setWorkspaceActive(false);
+    updateCursorPosition();
+}
+
+function applySelectedColor(color: string) {
+    if (!activePickerId) return;
+    const picker = document.getElementById(activePickerId);
+    if (!picker) return;
+
+    // Persist in state
+    customColors[activePickerId] = color;
+
+    // Update the custom dot
+    let customDot = picker.querySelector('.custom-selected-dot') as HTMLElement;
+    if (customDot) {
+        customDot.style.background = color;
+        customDot.dataset.color = color;
+        customDot.classList.remove('hidden');
+        picker.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+        customDot.classList.add('active');
+    }
+
+    if (activePickerId === 'colorPicker') {
+        applyColor(color);
+    } else if (activePickerId === 'canvasBgPicker') {
+        if (container) {
+            container.dataset.bgColor = color;
+            updateCanvasBackground();
+        }
+    } else if (activePickerId === 'canvasBorderColorPicker') {
+        if (container) {
+            setCanvasBorderColor(color);
+            updateCanvasBorder();
+        }
+    } else if (activePickerId === 'converterColorPicker') {
+        const converter = pageRouter.getConverterInstance();
+        if (converter) {
+            converter.updateFilterColor(color);
+        }
+    }
+
+    // Re-render UI to update dots if color was custom
+    renderUIComponents();
+    updateGlobalReferences();
+    createIcons();
+}
+
+// Math helpers
+function hsbToRgb(h: number, s: number, b: number) {
+    s /= 100; b /= 100;
+    const k = (n: number) => (n + h / 60) % 6;
+    const f = (n: number) => b * (1 - s * Math.max(0, Math.min(k(n), 4 - k(n), 1)));
+    return { r: Math.round(255 * f(5)), g: Math.round(255 * f(3)), b: Math.round(255 * f(1)) };
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+function hexToRgb(hex: string) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+}
+
+function rgbToHsb(r: number, g: number, b: number) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0, v = max;
+    const d = max - min;
+    s = max === 0 ? 0 : d / max;
+    if (max !== min) {
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+    return { h: Math.round(h * 360), s: Math.round(s * 100), v: Math.round(v * 100) };
 }
 
 function handleWheel(e: WheelEvent) {
+    if (!State.workspaceActive || document.querySelector('.floating-window:not(.hidden)')) return;
     if (!workspace || !canvas) return;
     e.preventDefault();
 
-    // 1. Get current physical position of drawing surface
-    const canvasRect = canvas.getBoundingClientRect();
+    // 1. Get current physical position of drawing surface (container)
+    const containerRect = container.getBoundingClientRect();
 
     // 2. Identify the logical "Scene" coordinate under the mouse
     // This is the invariant point we want to keep under the cursor.
-    const sceneX = (e.clientX - canvasRect.left) / State.workspaceScale;
-    const sceneY = (e.clientY - canvasRect.top) / State.workspaceScale;
+    const sceneX = (e.clientX - containerRect.left) / State.workspaceScale;
+    const sceneY = (e.clientY - containerRect.top) / State.workspaceScale;
 
     // 3. Calculate new scale
     const delta = -e.deltaY, factor = 1 + delta * 0.001;
@@ -489,8 +1467,8 @@ function handleWheel(e: WheelEvent) {
         // 4. Stable "Initial" layout position (pan=0)
         // Since transform-origin is 0,0, the left edge visual position is: InitialLeft + PanX
         // So InitialLeft = current_left - current_pan
-        const initialLayoutX = canvasRect.left - workspacePan.x;
-        const initialLayoutY = canvasRect.top - workspacePan.y;
+        const initialLayoutX = containerRect.left - workspacePan.x;
+        const initialLayoutY = containerRect.top - workspacePan.y;
 
         setWorkspaceScale(newScale);
 
@@ -515,12 +1493,29 @@ let transformPivot = { x: 0, y: 0, minX: 0, minY: 0, width: 0, height: 0 };
 let modeBeforeMiddleClick: string | null = null;
 
 function updateCursor(e: PointerEvent) {
+    if (!State.workspaceActive) {
+        if (document.body.style.cursor !== 'default') {
+            document.body.style.cursor = 'default';
+        }
+        return;
+    }
+    // 1. Priority: Active drag states (locked cursors)
     if (State.isPanning) { document.body.style.cursor = 'grabbing'; return; }
+    if (State.isMoving) { document.body.style.cursor = 'move'; return; }
+    if (State.isResizing) {
+        if (resizeType === 'r') { document.body.style.cursor = 'ew-resize'; return; }
+        if (resizeType === 'b') { document.body.style.cursor = 'ns-resize'; return; }
+        if (resizeType === 'br') { document.body.style.cursor = 'nwse-resize'; return; }
+        return;
+    }
+    if (State.isRotating) { document.body.style.cursor = 'grabbing'; return; }
+
     const target = e.target as HTMLElement;
-    if (target.closest('.side-panel, .app-header')) {
+    if (target.closest('.side-panel, .app-header, .floating-window')) {
         document.body.style.cursor = 'default'; return;
     }
 
+    // 2. Hover states for different modes
     if (State.currentMode === 'pan') { document.body.style.cursor = 'grab'; }
     else if (State.currentMode === 'draw') { document.body.style.cursor = 'crosshair'; }
     else if (State.currentMode === 'select' || State.currentMode === 'transform') {
@@ -534,7 +1529,8 @@ function updateCursor(e: PointerEvent) {
         } else {
             const { x: cx, y: cy } = getCanvasCoordinates(e);
             const bounds = getSelectedDataBounds();
-            if (cx >= bounds.minX && cx <= bounds.maxX && cy >= bounds.minY && cy <= bounds.maxY) {
+            // Check if mouse is over any selected stroke or well within the selection box
+            if (cx >= bounds.minX - 5 && cx <= bounds.maxX + 5 && cy >= bounds.minY - 5 && cy <= bounds.maxY + 5) {
                 document.body.style.cursor = 'move';
             } else { document.body.style.cursor = 'default'; }
         }
@@ -542,8 +1538,9 @@ function updateCursor(e: PointerEvent) {
 }
 
 function handlePointerDown(e: PointerEvent) {
+    if (!State.workspaceActive) return;
     const target = e.target as HTMLElement;
-    if (target.closest('.side-panel') || target.closest('.app-header')) return;
+    if (target.closest('.side-panel, .app-header, .floating-window')) return;
 
     if (e.button === 1) {
         modeBeforeMiddleClick = State.currentMode; setMode('pan'); setPanning(true);
@@ -551,8 +1548,6 @@ function handlePointerDown(e: PointerEvent) {
     }
 
     const { x: cx, y: cy } = getCanvasCoordinates(e);
-    const rect = canvas.getBoundingClientRect();
-    const isInsideCanvas = (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom);
     const handleEl = (e.target as HTMLElement).closest('.resize-handle') as HTMLElement;
 
     if (handleEl && (State.currentMode === 'select' || State.currentMode === 'transform')) {
@@ -564,11 +1559,17 @@ function handlePointerDown(e: PointerEvent) {
             minX: bounds.minX, minY: bounds.minY, width: Math.max(1, bounds.maxX - bounds.minX), height: Math.max(1, bounds.maxY - bounds.minY)
         };
         if (resizeType === 'rotate') { setRotating(true); rotateStart.angle = Math.atan2(cy - transformPivot.y, cx - transformPivot.x); }
-        else { setResizing(true); resizeStart.x = cx; resizeStart.y = cy; }
+        else { setResizing(true, resizeType); resizeStart.x = cx; resizeStart.y = cy; }
         (e.target as HTMLElement).setPointerCapture(e.pointerId); return;
     }
 
-    if (!isInsideCanvas) return;
+    function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
+        const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+        if (l2 === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+        let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.sqrt((px - (x1 + t * (x2 - x1))) ** 2 + (py - (y1 + t * (y2 - y1))) ** 2);
+    }
 
     if (State.currentMode === 'select' || State.currentMode === 'transform') {
         const bounds = getSelectedDataBounds();
@@ -577,30 +1578,36 @@ function handlePointerDown(e: PointerEvent) {
         let clickedStrokeIdx = -1;
         const rect = canvas.getBoundingClientRect();
         const actualScaleX = rect.width / canvas.offsetWidth || 1;
-        const hitSlop = 10 / actualScaleX;
 
         for (let i = data.length - 1; i >= 0; i--) {
             const stroke = data[i];
-            const radius = ((stroke.maxWidth + stroke.minWidth) / 2) + hitSlop;
+            const baseSlop = 15 / actualScaleX;
+            const radius = ((stroke.maxWidth + stroke.minWidth) / 2) + baseSlop;
+            const tolerance = 12 / State.workspaceScale;
+            const threshold = radius + tolerance;
 
-            // Optimization: Bounding Box Check first
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
             for (const p of stroke.points) {
-                if (p.x < minX) minX = p.x;
-                if (p.x > maxX) maxX = p.x;
-                if (p.y < minY) minY = p.y;
-                if (p.y > maxY) maxY = p.y;
+                if (p.x < sMinX) sMinX = p.x; if (p.x > sMaxX) sMaxX = p.x;
+                if (p.y < sMinY) sMinY = p.y; if (p.y > sMaxY) sMaxY = p.y;
             }
+            if (cx < sMinX - threshold || cx > sMaxX + threshold || cy < sMinY - threshold || cy > sMaxY + threshold) continue;
 
-            // Expand by radius
-            minX -= radius; maxX += radius; minY -= radius; maxY += radius;
+            // Detailed Check: Distance to each segment
+            for (let j = 0; j < stroke.points.length - 1; j++) {
+                const p1 = stroke.points[j], p2 = stroke.points[j + 1];
+                if (distToSegment(cx, cy, p1.x, p1.y, p2.x, p2.y) < threshold) {
+                    clickedStrokeIdx = i; break;
+                }
+            }
+            if (clickedStrokeIdx !== -1) break;
 
-            if (cx < minX || cx > maxX || cy < minY || cy > maxY) continue;
-
-            // Detailed Check
-            if (stroke.points.some((p: any) => Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2) < radius)) {
-                clickedStrokeIdx = i;
-                break;
+            // Single point stroke check
+            if (stroke.points.length === 1) {
+                const p = stroke.points[0];
+                if (Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2) < threshold) {
+                    clickedStrokeIdx = i; break;
+                }
             }
         }
 
@@ -617,13 +1624,18 @@ function handlePointerDown(e: PointerEvent) {
         } else {
             if (State.currentMode === 'select') {
                 setSelecting(true); selectStart.x = cx; selectStart.y = cy;
-                if (selectionBox) { selectionBox.style.display = 'block'; selectionBox.style.width = '0'; selectionBox.style.height = '0'; }
-            } else if (State.currentMode === 'transform' && !clickedInsideSelection) deselectStroke();
+                // If it's a fixed click on background, findStrokesInArea will handle deselection on Up
+            } else if (State.currentMode === 'transform' && !clickedInsideSelection) {
+                deselectStroke();
+            }
         }
-    } else if (State.currentMode === 'pan') { setPanning(true); panStart = { x: e.clientX, y: e.clientY }; }
+    } else if (State.currentMode === 'pan') {
+        setPanning(true); panStart = { x: e.clientX, y: e.clientY };
+    }
 }
 
 function handlePointerMove(e: PointerEvent) {
+    if (!State.workspaceActive) return;
     updateCursor(e);
     if (State.isPanning) {
         workspacePan.x += (e.clientX - panStart.x); workspacePan.y += (e.clientY - panStart.y);
@@ -631,8 +1643,12 @@ function handlePointerMove(e: PointerEvent) {
     }
     const { x: cx, y: cy } = getCanvasCoordinates(e);
     if (State.isSelecting && selectionBox) {
-        const x = Math.min(cx, selectStart.x), y = Math.min(cy, selectStart.y), w = Math.abs(cx - selectStart.x), h = Math.abs(cy - selectStart.y);
-        selectionBox.style.left = x + 'px'; selectionBox.style.top = y + 'px'; selectionBox.style.width = w + 'px'; selectionBox.style.height = h + 'px';
+        const dx = Math.abs(cx - selectStart.x), dy = Math.abs(cy - selectStart.y);
+        if (dx > 3 || dy > 3) {
+            const x = Math.min(cx, selectStart.x), y = Math.min(cy, selectStart.y), w = Math.abs(cx - selectStart.x), h = Math.abs(cy - selectStart.y);
+            selectionBox.style.display = 'block';
+            selectionBox.style.left = x + 'px'; selectionBox.style.top = y + 'px'; selectionBox.style.width = w + 'px'; selectionBox.style.height = h + 'px';
+        }
     } else if (State.isMoving) {
         const dx = cx - moveStart.x, dy = cy - moveStart.y;
         if (dx !== 0 || dy !== 0) {
@@ -672,11 +1688,18 @@ function handlePointerMove(e: PointerEvent) {
 }
 
 function handlePointerUp(e: PointerEvent) {
+    if (!State.workspaceActive) return;
     if (State.isPanning && modeBeforeMiddleClick) { setMode(modeBeforeMiddleClick); modeBeforeMiddleClick = null; }
     if (State.isSelecting) {
-        setSelecting(false); if (selectionBox) selectionBox.style.display = 'none';
+        setSelecting(false);
+        if (selectionBox) {
+            selectionBox.style.display = 'none';
+            selectionBox.style.width = '0';
+            selectionBox.style.height = '0';
+        }
         const { x: cx, y: cy } = getCanvasCoordinates(e);
         findStrokesInArea(selectStart.x, selectStart.y, cx, cy, e.shiftKey, e.ctrlKey);
+        selectStart = { x: 0, y: 0 };
     }
 
     if (State.isMoving || State.isResizing || State.isRotating) {
@@ -707,7 +1730,7 @@ function handlePointerUp(e: PointerEvent) {
                 });
             });
         }
-        signaturePad.fromData(data);
+        safeFromData(data);
         updateSelectedBounds();
         drawSelectionHighlights();
         syncControlsWithSelection();
@@ -795,25 +1818,39 @@ function findStrokesInArea(x1: number, y1: number, x2: number, y2: number, shift
     const actualScaleX = rect.width / (canvas.offsetWidth || 1);
     const isClick = (Math.abs(x2 - x1) * actualScaleX) < 5 && (Math.abs(y2 - y1) * actualScaleX) < 5;
     const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
-    data.forEach((stroke, idx) => {
-        let match = false;
-        const hitSlop = 5 / actualScaleX;
-        const radius = ((stroke.maxWidth + stroke.minWidth) / 2) + hitSlop;
+    function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
+        const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+        if (l2 === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+        let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.sqrt((px - (x1 + t * (x2 - x1))) ** 2 + (py - (y1 + t * (y2 - y1))) ** 2);
+    }
 
-        // Fast Bounding Box Check
+    data.forEach((stroke, idx) => {
+        if (!stroke) return;
+        let match = false;
+        const hitSlop = 15 / actualScaleX;
+        const radius = (((stroke.maxWidth || 0) + (stroke.minWidth || 0)) / 2) + hitSlop;
+        const tolerance = 12 / State.workspaceScale;
+        const threshold = radius + tolerance;
+
         let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
         for (const p of stroke.points) {
-            if (p.x < sMinX) sMinX = p.x;
-            if (p.x > sMaxX) sMaxX = p.x;
-            if (p.y < sMinY) sMinY = p.y;
-            if (p.y > sMaxY) sMaxY = p.y;
+            if (p.x < sMinX) sMinX = p.x; if (p.x > sMaxX) sMaxX = p.x;
+            if (p.y < sMinY) sMinY = p.y; if (p.y > sMaxY) sMaxY = p.y;
         }
-        sMinX -= radius; sMaxX += radius; sMinY -= radius; sMaxY += radius;
 
         if (isClick) {
-            // Click selection
-            if (midX >= sMinX && midX <= sMaxX && midY >= sMinY && midY <= sMaxY) {
-                if (stroke.points.some((p: any) => Math.sqrt((p.x - midX) ** 2 + (p.y - midY) ** 2) < radius + (10 / State.workspaceScale))) match = true;
+            if (midX >= sMinX - threshold && midX <= sMaxX + threshold && midY >= sMinY - threshold && midY <= sMaxY + threshold) {
+                for (let j = 0; j < stroke.points.length - 1; j++) {
+                    if (distToSegment(midX, midY, stroke.points[j].x, stroke.points[j].y, stroke.points[j + 1].x, stroke.points[j + 1].y) < threshold) {
+                        match = true; break;
+                    }
+                }
+                if (!match && stroke.points.length === 1) {
+                    const p = stroke.points[0];
+                    if (Math.sqrt((p.x - midX) ** 2 + (p.y - midY) ** 2) < threshold) match = true;
+                }
             }
         } else {
             // Drag Selection (Marquee)
@@ -844,9 +1881,10 @@ function selectStrokes(indices: number[], save = true) {
     if (save) saveState(); setSelectedIndices(indices);
 
     updateTransformPanelState();
+    updateSelectionInfo();
 
-    if (selectionInfo) { selectionInfo.innerText = `Trazos Seleccionados: ${indices.length}`; selectionInfo.style.display = indices.length > 0 ? 'block' : 'none'; }
     updateSelectedBounds(); drawSelectionHighlights(); syncControlsWithSelection();
+    updateStrokeStyles();
 }
 
 function deselectStroke(save = true) {
@@ -854,7 +1892,7 @@ function deselectStroke(save = true) {
     if (save) saveState(); setSelectedIndices([]);
 
     updateTransformPanelState();
+    updateSelectionInfo();
 
-    if (selectionInfo) selectionInfo.style.display = 'none';
     updateSelectedBounds(); drawSelectionHighlights();
 }

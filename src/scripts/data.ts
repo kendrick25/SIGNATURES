@@ -1,5 +1,5 @@
 import { createIcons as lucideCreateIcons, icons } from 'lucide';
-import { currentLang, UIConfig, I18nContent, setDynamicRefs } from '@/scripts/state';
+import { currentLang, UIConfig, I18nContent, setDynamicRefs, customColors, favoriteColors, State, setLang, container } from '@/scripts/state';
 
 // ... (skipping i18n and UI_CONFIG constant definitions which are huge)
 
@@ -17,6 +17,15 @@ export const i18n: I18nContent = {
         copyPng: "Copiar PNG al Portapapeles",
         downloadPng: "Descargar como PNG",
         downloadSvg: "Descargar como SVG",
+        downloadJpg: "Descargar como JPG",
+        downloadWebp: "Descargar como WEBP",
+        copyBase64Png: "Copiar PNG como Base64",
+        copyBase64Svg: "Copiar SVG como Base64",
+        copyBase64Jpg: "Copiar JPG como Base64",
+        copyBase64Webp: "Copiar WEBP como Base64",
+        exportSettings: "CONFIGURACIÓN DE EXPORTACIÓN",
+        quality: "CALIDAD",
+        dpi: "DPI / RESOLUCIÓN",
         panelTitle: "PANEL DE CONTROL",
         stroke: "TRAZO",
         natural: "Natural",
@@ -50,6 +59,11 @@ export const i18n: I18nContent = {
         toastPngDownloaded: "PNG descargado",
         toastSvgDownloaded: "SVG descargado",
         toastPngCopied: "Firma copiada como PNG",
+        toastSvgCopied: "Firma copiada como SVG",
+        toastJpgCopied: "Firma copiada como JPG",
+        toastWebpCopied: "Firma copiada como WEBP",
+        toastJpgDownloaded: "JPG descargado",
+        toastWebpDownloaded: "WEBP descargado",
         transformation: "TRANSFORMACIÓN",
         rotateL: "Girar Izquierda",
         rotateR: "Girar Derecha",
@@ -59,7 +73,35 @@ export const i18n: I18nContent = {
         float: "Flotar",
         dock: "Fijar",
         workspaceTitle: "ESPACIO DE TRABAJO",
-        settings: "CONFIGURACIÓN"
+        settings: "CONFIGURACIÓN",
+        backgroundColor: "COLOR DE FONDO",
+        borderRadius: "RADIO DE BORDE",
+        borderType: "TIPO DE BORDE",
+        borderColor: "COLOR DE BORDE",
+        borderWidth: "GROSOR DE BORDE",
+        borderOffset: "Separación de Borde",
+        solid: "Sólido",
+        dashed: "Guiones",
+        dotted: "Puntos",
+        borderSpacing: "ESPACIADO DE BORDE",
+        toastMaxFavorites: "Máximo 4 favoritos permitidos",
+        exportModalTitle: "PREVISUALIZACIÓN Y AJUSTES",
+        exportModalSub: "Ajusta los parámetros antes de finalizar",
+        confirmExport: "EXPORTAR AHORA",
+        confirmCopy: "COPIAR AL PORTAPAPEL",
+        format: "FORMATO",
+        action: "ACCIÓN",
+        clipOutOfBounds: "RECORTAR TRAZOS FUERA DEL LIENZO",
+        viewClipOutOfBounds: "OCULTAR TRAZOS FUERA DEL LIENZO",
+        copyImage: "Copiar Imagen",
+        copyBase64: "Copiar Base64",
+        download: "Descargar Archivo",
+        uniform: "TRAZO UNIFORME",
+        smoothing: "SUAVIZADO DE CURVAS",
+        colorQuality: "INTENSIDAD DE COLOR",
+        showGrid: "VER CUADRÍCULA",
+        colorFilter: "FILTRO DE COLOR",
+        applyFilter: "Habilitar filtro de color"
     },
     en: {
         drawMode: "Drawing Mode (P)",
@@ -73,6 +115,15 @@ export const i18n: I18nContent = {
         copyPng: "Copy PNG to Clipboard",
         downloadPng: "Download as PNG",
         downloadSvg: "Download as SVG",
+        downloadJpg: "Download as JPG",
+        downloadWebp: "Download as WEBP",
+        copyBase64Png: "Copy PNG as Base64",
+        copyBase64Svg: "Copy SVG as Base64",
+        copyBase64Jpg: "Copy JPG as Base64",
+        copyBase64Webp: "Copy WEBP as Base64",
+        exportSettings: "EXPORT SETTINGS",
+        quality: "QUALITY",
+        dpi: "DPI / RESOLUTION",
         panelTitle: "CONTROL PANEL",
         stroke: "STROKE",
         natural: "Natural",
@@ -106,6 +157,11 @@ export const i18n: I18nContent = {
         toastPngDownloaded: "PNG downloaded",
         toastSvgDownloaded: "SVG downloaded",
         toastPngCopied: "Signature copied as PNG",
+        toastSvgCopied: "Signature copied as SVG",
+        toastJpgCopied: "Signature copied as JPG",
+        toastWebpCopied: "Signature copied as WEBP",
+        toastJpgDownloaded: "JPG downloaded",
+        toastWebpDownloaded: "WEBP downloaded",
         transformation: "TRANSFORMATION",
         rotateL: "Rotate Left",
         rotateR: "Rotate Right",
@@ -115,7 +171,35 @@ export const i18n: I18nContent = {
         float: "Float",
         dock: "Dock",
         workspaceTitle: "WORKSPACE",
-        settings: "SETTINGS"
+        settings: "SETTINGS",
+        backgroundColor: "BACKGROUND COLOR",
+        borderRadius: "BORDER RADIUS",
+        borderType: "BORDER TYPE",
+        borderColor: "BORDER COLOR",
+        borderWidth: "BORDER WIDTH",
+        borderOffset: "Border Separation",
+        solid: "Solid",
+        dashed: "Dashed",
+        dotted: "Dotted",
+        borderSpacing: "BORDER SPACING",
+        toastMaxFavorites: "Maximum 4 favorites allowed",
+        exportModalTitle: "PREVIEW & SETTINGS",
+        exportModalSub: "Adjust parameters before finishing",
+        confirmExport: "EXPORT NOW",
+        confirmCopy: "COPY TO CLIPBOARD",
+        format: "FORMAT",
+        action: "ACTION",
+        clipOutOfBounds: "CLIP STROKES OUTSIDE CANVAS",
+        viewClipOutOfBounds: "HIDE STROKES OUTSIDE CANVAS",
+        copyImage: "Copy Image",
+        copyBase64: "Copy Base64",
+        download: "Download File",
+        uniform: "UNIFORM STROKE",
+        smoothing: "CURVE SMOOTHING",
+        colorQuality: "COLOR INTENSITY",
+        showGrid: "SHOW GRID",
+        colorFilter: "COLOR FILTER",
+        applyFilter: "Enable color filter"
     }
 };
 
@@ -123,7 +207,7 @@ export const UI_CONFIG: UIConfig = {
     modes: [
         { id: 'draw', icon: 'Pencil', titleKey: 'drawMode', shortcut: 'P' },
         { id: 'select', icon: 'MousePointer2', titleKey: 'selectMode', shortcut: 'V' },
-        { id: 'transform', icon: 'MoveDiagonal', titleKey: 'transformMode', shortcut: 'T' },
+        { id: 'transform', icon: 'Move', titleKey: 'transformMode', shortcut: 'T' },
         { id: 'pan', icon: 'Hand', titleKey: 'panMode', shortcut: 'H' }
     ],
     tools: [
@@ -139,6 +223,7 @@ export const UI_CONFIG: UIConfig = {
         { id: 'brush', preset: 'brush', key: 'brush' }
     ],
     colors: [
+        { color: 'transparent', label: 'none' },
         { color: '#ffffff', active: true },
         { color: '#6366f1' },
         { color: '#06b6d4' },
@@ -154,14 +239,9 @@ export const UI_CONFIG: UIConfig = {
         { id: 'en', label: 'EN' }
     ],
     workspaceShortcuts: [
-        { id: 'centerCanvasBtn', icon: 'Focus', i18nKey: 'recenter', titleKey: 'recenter' },
         { id: 'resetSizeBtn', icon: 'Maximize', i18nKey: 'autoAdjust' }
     ],
-    exportOptions: [
-        { id: 'copyPngBtn', icon: 'Copy', i18nKey: 'copyPng' },
-        { id: 'downloadPngBtn', icon: 'Image', i18nKey: 'downloadPng' },
-        { id: 'downloadSvgBtn', icon: 'FileCode', i18nKey: 'downloadSvg' }
-    ],
+    exportOptions: [],
     settings: [
         { id: 'fullscreenRow', i18nKey: 'fullscreen', type: 'button', btnId: 'fullscreenBtn', icon: 'Maximize' },
         { id: 'darkModeRow', i18nKey: 'darkMode', type: 'toggle', toggleId: 'darkModeToggle' },
@@ -174,7 +254,10 @@ export function renderUIComponents() {
     renderTools();
     renderExportOptions();
     renderStrokePresets();
-    renderColorPicker();
+    renderColorPicker('colorPicker');
+    renderColorPicker('canvasBgPicker');
+    renderColorPicker('canvasBorderColorPicker');
+    renderColorPicker('converterColorPicker');
     renderCanvasPresets();
     renderSettings();
     renderWorkspaceShortcuts();
@@ -253,22 +336,51 @@ function renderStrokePresets() {
     `).join('');
 }
 
-function renderColorPicker() {
-    const container = document.getElementById('colorPicker');
-    if (!container) return;
+export function renderColorPicker(containerId: string) {
+    const containerEl = document.getElementById(containerId);
+    if (!containerEl) return;
 
-    const dots = UI_CONFIG.colors.map(c => `
-        <div class="color-dot ${c.active ? 'active' : ''}" 
-             style="background: ${c.color}; ${c.border ? 'border: 1px solid var(--glass-border);' : ''}" 
-             data-color="${c.color}"></div>
-    `).join('');
+    let currentVal = customColors[containerId];
+    if (!currentVal) {
+        if (containerId === 'colorPicker') currentVal = State.lastBaseColor;
+        else if (containerId === 'canvasBgPicker') currentVal = container?.dataset.bgColor || 'transparent';
+        else if (containerId === 'canvasBorderColorPicker') currentVal = State.currentCanvasBorderColor;
+    }
 
-    container.innerHTML = `
-        ${dots}
-        <div class="custom-color-btn" id="customColorBtn" title="Color personalizado">
-            <i data-lucide="Plus"></i>
+    const transparentDot = `
+        <div class="color-dot ${currentVal === 'transparent' ? 'active' : ''}" 
+             style="background: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 8px 8px; background-position: 0 0, 0 4px, 4px 4px, 4px 0; background-color: #fff;" 
+             data-color="transparent"></div>
+    `;
+
+    const favDots = favoriteColors.map(color => {
+        const active = currentVal?.toLowerCase() === color.toLowerCase();
+        const isLight = color.toLowerCase() === '#ffffff';
+        const isBlack = color.toLowerCase() === '#000000';
+        let dotStyle = `background: ${color};`;
+        if (isBlack || isLight) dotStyle += 'border: 1px solid var(--glass-border);';
+
+        return `
+            <div class="color-dot ${active ? 'active' : ''}" 
+                 style="${dotStyle}" 
+                 data-color="${color}"></div>
+        `;
+    }).join('');
+
+    const customColor = customColors[containerId];
+    const customDotHtml = customColor ? `
+        <div class="color-dot custom-selected-dot active" style="background: ${customColor}" data-color="${customColor}"></div>
+    ` : `
+        <div class="color-dot custom-selected-dot hidden" data-color=""></div>
+    `;
+
+    containerEl.innerHTML = `
+        ${transparentDot}
+        ${favDots}
+        ${customDotHtml}
+        <div class="custom-color-btn" title="Color personalizado">
+            <i data-lucide="plus"></i>
         </div>
-        <input type="color" id="hiddenColorInput" style="display: none;">
     `;
 }
 
@@ -289,7 +401,7 @@ function renderCanvasPresets() {
 function renderLanguageButtons() {
     const containers = document.querySelectorAll('.panel-lang-container');
     const html = UI_CONFIG.languages.map(lang => `
-        <button class="lang-btn ${lang.id === currentLang ? 'active' : ''}" 
+        <button class="lang-btn ${lang.id === State.currentLang ? 'active' : ''}" 
                 data-lang="${lang.id}">
             ${lang.label}
         </button>
@@ -352,6 +464,7 @@ export function updateGlobalReferences() {
 }
 
 export function updateLanguage(lang: string) {
+    setLang(lang);
     document.documentElement.lang = lang;
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');

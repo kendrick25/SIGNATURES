@@ -10,9 +10,10 @@ export function initApp() {
     const hint = document.getElementById('canvasHint') as HTMLElement;
     const workspace = document.getElementById('workspace') as HTMLElement;
     const selectionCanvas = document.getElementById('selectionCanvas') as HTMLCanvasElement;
-    const selectionBox = document.getElementById('selectionBox') as HTMLElement;
+    const selectionBox = document.getElementById('dragSelection') as HTMLElement;
     const selectionInfo = document.getElementById('selectionInfo') as HTMLElement;
     const sidePanel = document.getElementById('sidePanel') as HTMLElement;
+    const colorLayer = document.getElementById('canvasColorLayer') as HTMLElement;
 
     if (!canvas || !containerRef) {
         throw new Error("Critical DOM elements missing: signatureCanvas or canvasContainer");
@@ -33,7 +34,8 @@ export function initApp() {
         selectionInfo,
         sidePanel,
         ctx,
-        sctx
+        sctx,
+        colorLayer
     });
 
     console.log("initApp: Rendering UI...");
@@ -52,11 +54,11 @@ export function initApp() {
     const pad = new SignaturePad(canvas, {
         backgroundColor: 'rgba(0,0,0,0)',
         penColor: lastBaseColor,
-        minWidth: 0.8,
-        maxWidth: 3.8,
-        velocityFilterWeight: 0.5,
+        minWidth: 1.2,
+        maxWidth: 4.2,
+        velocityFilterWeight: 0.6,
         throttle: 8,
-        minDistance: 0.5
+        minDistance: 1.0
     });
 
     setSignaturePad(pad);
